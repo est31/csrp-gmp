@@ -4,8 +4,8 @@ csrp-gmp
 csrp-gmp is a minimal C implementation of the [Secure Remote Password
 protocol](http://srp.stanford.edu/), originally written by Tom Cocagne
 to depend on OpenSSL, ported to LibGMP by est31.
-The project consists of a single C file and is intended for direct
-inclusion into utilizing programs. It's only dependency is LibGMP.
+The project is intended for direct inclusion into utilizing programs.
+It's only dependency is LibGMP.
 
 SRP Overview
 ------------
@@ -34,7 +34,8 @@ for symmetric-key encryption.
 Porter's notes
 --------------
 
-Compared with csrp, some things have changed for the outside.
+Compared with [csrp](https://github.com/cocagne/csrp), some things
+have changed for the outside.
 As LibGMP doesn't ship with a cryptographically strong PRNG, strong
 PRNGs provided (and seeded) by the OS are used instead. On unix-based
 operating systems, you should ensure that /dev/urandom is readable.
@@ -43,11 +44,14 @@ The call `srp_random_seed` has been removed.
 The call `srp_user_new` has a new parameter, `username_for_verifier`,
 allowing to use different usernames for verifier and srp login.
 
+Added option for `srp_create_salted_verification_key` call to specify
+a salt.
+
 We ship with OpenSSL's implementation of the SHA256 hash algorithm.
 Support for other hash algoritms was dropped (but re-introducing is
-fairly easy).
+fairly easy, just copy from an OpenSSL source distribution).
 
 Usage Example
 -------------
 
-For an usage example, see test_srp.c
+For an usage example, see `test_srp.c`
