@@ -8,7 +8,7 @@
 
 
 #define NITER          100
-#define TEST_HASH      SRP_SHA1
+#define TEST_HASH      SRP_SHA256
 #define TEST_NG        SRP_NG_1024
 
 unsigned long long get_usec()
@@ -76,7 +76,7 @@ int main( int argc, char * argv[] )
     
     for( i = 0; i < NITER; i++ )
     {
-        usr =  srp_user_new( alg, ng_type, username, 
+        usr =  srp_user_new( alg, ng_type, username, username,
                              (const unsigned char *)password, 
                              strlen(password), n_hex, g_hex );
 

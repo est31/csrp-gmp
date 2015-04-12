@@ -4,19 +4,19 @@
  * https://github.com/cocagne/csrp
  *
  * The MIT License (MIT)
- * 
- * Copyright (c) 2013 Tom Cocagne
- * 
+ *
+ * Copyright (c) 2013 Tom Cocagne, 2015 est31 <MTest31@outlook.com>
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
  * of the Software, and to permit persons to whom the Software is furnished to do
  * so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -24,7 +24,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- * 
+ *
  */
 
 #ifdef WIN32
@@ -37,23 +37,24 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <openssl/bn.h>
-#include <openssl/sha.h>
-#include <openssl/crypto.h>
-#include <openssl/rand.h>
-
+#include <gmp.h>
+#include <sha/sha2.h>
 
 #include "srp.h"
 
 static int g_initialized = 0;
 
+#define RAND_BUFF_MAX 128
+static unsigned int g_rand_idx;
+static unsigned char g_rand_buff[RAND_BUFF_MAX];
+
 typedef struct
 {
-    BIGNUM     * N;
-    BIGNUM     * g;
+    mpz_t N;
+    mpz_t g;
 } NGConstant;
 
-struct NGHex 
+struct NGHex
 {
     const char * n_hex;
     const char * g_hex;
@@ -146,9 +147,9 @@ static struct NGHex global_Ng_constants[] = {
 
 static NGConstant * new_ng( SRP_NGType ng_type, const char * n_hex, const char * g_hex )
 {
-    NGConstant * ng   = (NGConstant *) malloc( sizeof(NGConstant) );
-    ng->N             = BN_new();
-    ng->g             = BN_new();
+    NGConstant * ng = (NGConstant *) malloc( sizeof(NGConstant) );
+    mpz_init(ng->N);
+    mpz_init(ng->g);
 
     if( !ng || !ng->N || !ng->g )
        return 0;
@@ -158,10 +159,10 @@ static NGConstant * new_ng( SRP_NGType ng_type, const char * n_hex, const char *
         n_hex = global_Ng_constants[ ng_type ].n_hex;
         g_hex = global_Ng_constants[ ng_type ].g_hex;
     }
-        
-    BN_hex2bn( &ng->N, n_hex );
-    BN_hex2bn( &ng->g, g_hex );
-    
+
+    mpz_set_str( ng->N, n_hex, 16 );
+    mpz_set_str( ng->g, g_hex, 16 );
+
     return ng;
 }
 
@@ -169,21 +170,19 @@ static void delete_ng( NGConstant * ng )
 {
    if (ng)
    {
-      BN_free( ng->N );
-      BN_free( ng->g );
-      ng->N = 0;
-      ng->g = 0;
+      mpz_clear( ng->N );
+      mpz_clear( ng->g );
       free(ng);
    }
 }
 
 
 
-typedef union 
+typedef union
 {
     SHA_CTX    sha;
     SHA256_CTX sha256;
-    SHA512_CTX sha512;
+    //SHA512_CTX sha512;
 } HashCTX;
 
 
@@ -191,11 +190,11 @@ struct SRPVerifier
 {
     SRP_HashAlgorithm  hash_alg;
     NGConstant        *ng;
-    
+
     const char          * username;
     const unsigned char * bytes_B;
     int                   authenticated;
-    
+
     unsigned char M           [SHA512_DIGEST_LENGTH];
     unsigned char H_AMK       [SHA512_DIGEST_LENGTH];
     unsigned char session_key [SHA512_DIGEST_LENGTH];
@@ -206,18 +205,19 @@ struct SRPUser
 {
     SRP_HashAlgorithm  hash_alg;
     NGConstant        *ng;
-    
-    BIGNUM *a;
-    BIGNUM *A;
-    BIGNUM *S;
+
+    mpz_t a;
+    mpz_t A;
+    mpz_t S;
 
     const unsigned char * bytes_A;
     int                   authenticated;
-    
+
     const char *          username;
+    const char *          username_verifier;
     const unsigned char * password;
     int                   password_len;
-    
+
     unsigned char M           [SHA512_DIGEST_LENGTH];
     unsigned char H_AMK       [SHA512_DIGEST_LENGTH];
     unsigned char session_key [SHA512_DIGEST_LENGTH];
@@ -228,11 +228,11 @@ static int hash_init( SRP_HashAlgorithm alg, HashCTX *c )
 {
     switch (alg)
     {
-      case SRP_SHA1  : return SHA1_Init( &c->sha );
-      case SRP_SHA224: return SHA224_Init( &c->sha256 );
+      /*case SRP_SHA1  : return SHA1_Init( &c->sha );
+      case SRP_SHA224: return SHA224_Init( &c->sha256 );*/
       case SRP_SHA256: return SHA256_Init( &c->sha256 );
-      case SRP_SHA384: return SHA384_Init( &c->sha512 );
-      case SRP_SHA512: return SHA512_Init( &c->sha512 );
+      /*case SRP_SHA384: return SHA384_Init( &c->sha512 );
+      case SRP_SHA512: return SHA512_Init( &c->sha512 );*/
       default:
         return -1;
     };
@@ -241,11 +241,11 @@ static int hash_update( SRP_HashAlgorithm alg, HashCTX *c, const void *data, siz
 {
     switch (alg)
     {
-      case SRP_SHA1  : return SHA1_Update( &c->sha, data, len );
-      case SRP_SHA224: return SHA224_Update( &c->sha256, data, len );
+      /*case SRP_SHA1  : return SHA1_Update( &c->sha, data, len );
+      case SRP_SHA224: return SHA224_Update( &c->sha256, data, len );*/
       case SRP_SHA256: return SHA256_Update( &c->sha256, data, len );
-      case SRP_SHA384: return SHA384_Update( &c->sha512, data, len );
-      case SRP_SHA512: return SHA512_Update( &c->sha512, data, len );
+      /*case SRP_SHA384: return SHA384_Update( &c->sha512, data, len );
+      case SRP_SHA512: return SHA512_Update( &c->sha512, data, len );*/
       default:
         return -1;
     };
@@ -254,11 +254,11 @@ static int hash_final( SRP_HashAlgorithm alg, HashCTX *c, unsigned char *md )
 {
     switch (alg)
     {
-      case SRP_SHA1  : return SHA1_Final( md, &c->sha );
-      case SRP_SHA224: return SHA224_Final( md, &c->sha256 );
+      /*case SRP_SHA1  : return SHA1_Final( md, &c->sha );
+      case SRP_SHA224: return SHA224_Final( md, &c->sha256 );*/
       case SRP_SHA256: return SHA256_Final( md, &c->sha256 );
-      case SRP_SHA384: return SHA384_Final( md, &c->sha512 );
-      case SRP_SHA512: return SHA512_Final( md, &c->sha512 );
+      /*case SRP_SHA384: return SHA384_Final( md, &c->sha512 );
+      case SRP_SHA512: return SHA512_Final( md, &c->sha512 );*/
       default:
         return -1;
     };
@@ -267,11 +267,11 @@ static unsigned char * hash( SRP_HashAlgorithm alg, const unsigned char *d, size
 {
     switch (alg)
     {
-      case SRP_SHA1  : return SHA1( d, n, md );
-      case SRP_SHA224: return SHA224( d, n, md );
+      /*case SRP_SHA1  : return SHA1( d, n, md );
+      case SRP_SHA224: return SHA224( d, n, md );*/
       case SRP_SHA256: return SHA256( d, n, md );
-      case SRP_SHA384: return SHA384( d, n, md );
-      case SRP_SHA512: return SHA512( d, n, md );
+      /*case SRP_SHA384: return SHA384( d, n, md );
+      case SRP_SHA512: return SHA512( d, n, md );*/
       default:
         return 0;
     };
@@ -280,49 +280,65 @@ static int hash_length( SRP_HashAlgorithm alg )
 {
     switch (alg)
     {
-      case SRP_SHA1  : return SHA_DIGEST_LENGTH;
-      case SRP_SHA224: return SHA224_DIGEST_LENGTH;
+      /*case SRP_SHA1  : return SHA_DIGEST_LENGTH;
+      case SRP_SHA224: return SHA224_DIGEST_LENGTH;*/
       case SRP_SHA256: return SHA256_DIGEST_LENGTH;
-      case SRP_SHA384: return SHA384_DIGEST_LENGTH;
-      case SRP_SHA512: return SHA512_DIGEST_LENGTH;
+      /*case SRP_SHA384: return SHA384_DIGEST_LENGTH;
+      case SRP_SHA512: return SHA512_DIGEST_LENGTH;*/
       default:
         return -1;
     };
 }
 
-
-static BIGNUM * H_nn( SRP_HashAlgorithm alg, const BIGNUM * n1, const BIGNUM * n2 )
+inline int mpz_num_bytes( const mpz_t op )
 {
-    unsigned char   buff[ SHA512_DIGEST_LENGTH ];
-    int             len_n1 = BN_num_bytes(n1);
-    int             len_n2 = BN_num_bytes(n2);
-    int             nbytes = len_n1 + len_n2;
-    unsigned char * bin    = (unsigned char *) malloc( nbytes );
-    if (!bin)
-       return 0;
-    BN_bn2bin(n1, bin);
-    BN_bn2bin(n2, bin + len_n1);
-    hash( alg, bin, nbytes, buff );
-    free(bin);
-    return BN_bin2bn(buff, hash_length(alg), NULL);
+    return (mpz_sizeinbase (op, 2) + 7) / 8;
 }
 
-static BIGNUM * H_ns( SRP_HashAlgorithm alg, const BIGNUM * n, const unsigned char * bytes, int len_bytes )
+inline void mpz_to_bin( const mpz_t op, unsigned char * to )
+{
+    mpz_export(to, NULL, 1, 1, 1, 0, op);
+}
+
+inline void mpz_from_bin( const unsigned char * s, int len, mpz_t ret )
+{
+    mpz_import(ret, len, 1, 1, 1, 0, s);
+}
+
+static int H_nn( mpz_t result, SRP_HashAlgorithm alg, const mpz_t n1, const mpz_t n2 )
 {
     unsigned char   buff[ SHA512_DIGEST_LENGTH ];
-    int             len_n  = BN_num_bytes(n);
+    int             len_n1 = mpz_num_bytes(n1);
+    int             len_n2 = mpz_num_bytes(n2);
+    int             nbytes = len_n1 + len_n2;
+    unsigned char * bin    = (unsigned char *) malloc( nbytes );
+    if (!bin) {
+       return 0;
+    }
+    mpz_to_bin(n1, bin);
+    mpz_to_bin(n2, bin + len_n1);
+    hash( alg, bin, nbytes, buff );
+    free(bin);
+    mpz_from_bin(buff, hash_length(alg), result);
+    return 1;
+}
+
+static int H_ns( mpz_t result, SRP_HashAlgorithm alg, const unsigned char * n, int len_n, const unsigned char * bytes, int len_bytes )
+{
+    unsigned char   buff[ SHA512_DIGEST_LENGTH ];
     int             nbytes = len_n + len_bytes;
     unsigned char * bin    = (unsigned char *) malloc( nbytes );
     if (!bin)
        return 0;
-    BN_bn2bin(n, bin);
+    memcpy( bin, n, len_n );
     memcpy( bin + len_n, bytes, len_bytes );
     hash( alg, bin, nbytes, buff );
     free(bin);
-    return BN_bin2bn(buff, hash_length(alg), NULL);
+    mpz_from_bin(buff, hash_length(alg), result);
+    return 1;
 }
-    
-static BIGNUM * calculate_x( SRP_HashAlgorithm alg, const BIGNUM * salt, const char * username, const unsigned char * password, int password_len )
+
+static int calculate_x( mpz_t result, SRP_HashAlgorithm alg, const unsigned char * salt, int salt_len, const char * username, const unsigned char * password, int password_len )
 {
     unsigned char ucp_hash[SHA512_DIGEST_LENGTH];
     HashCTX       ctx;
@@ -332,36 +348,36 @@ static BIGNUM * calculate_x( SRP_HashAlgorithm alg, const BIGNUM * salt, const c
     hash_update( alg, &ctx, username, strlen(username) );
     hash_update( alg, &ctx, ":", 1 );
     hash_update( alg, &ctx, password, password_len );
-    
+
     hash_final( alg, &ctx, ucp_hash );
-        
-    return H_ns( alg, salt, ucp_hash, hash_length(alg) );
+
+    return H_ns( result, alg, salt, salt_len, ucp_hash, hash_length(alg) );
 }
 
-static void update_hash_n( SRP_HashAlgorithm alg, HashCTX *ctx, const BIGNUM * n )
+static void update_hash_n( SRP_HashAlgorithm alg, HashCTX *ctx, const mpz_t n )
 {
-    unsigned long len = BN_num_bytes(n);
+    unsigned long len = mpz_num_bytes(n);
     unsigned char * n_bytes = (unsigned char *) malloc( len );
     if (!n_bytes)
        return;
-    BN_bn2bin(n, n_bytes);
+    mpz_to_bin(n, n_bytes);
     hash_update(alg, ctx, n_bytes, len);
     free(n_bytes);
 }
 
-static void hash_num( SRP_HashAlgorithm alg, const BIGNUM * n, unsigned char * dest )
+static void hash_num( SRP_HashAlgorithm alg, const mpz_t n, unsigned char * dest )
 {
-    int             nbytes = BN_num_bytes(n);
+    int             nbytes = mpz_num_bytes(n);
     unsigned char * bin    = (unsigned char *) malloc( nbytes );
     if(!bin)
        return;
-    BN_bn2bin(n, bin);
+    mpz_to_bin(n, bin);
     hash( alg, bin, nbytes, dest );
     free(bin);
 }
 
-static void calculate_M( SRP_HashAlgorithm alg, NGConstant *ng, unsigned char * dest, const char * I, const BIGNUM * s,
-                         const BIGNUM * A, const BIGNUM * B, const unsigned char * K )
+static void calculate_M( SRP_HashAlgorithm alg, NGConstant *ng, unsigned char * dest, const char * I, const unsigned char * s_bytes, int s_len,
+                         const mpz_t A, const mpz_t B, const unsigned char * K )
 {
     unsigned char H_N[ SHA512_DIGEST_LENGTH ];
     unsigned char H_g[ SHA512_DIGEST_LENGTH ];
@@ -370,79 +386,88 @@ static void calculate_M( SRP_HashAlgorithm alg, NGConstant *ng, unsigned char * 
     HashCTX       ctx;
     int           i = 0;
     int           hash_len = hash_length(alg);
-        
+
     hash_num( alg, ng->N, H_N );
     hash_num( alg, ng->g, H_g );
-    
+
     hash(alg, (const unsigned char *)I, strlen(I), H_I);
-    
-    
+
+
     for (i=0; i < hash_len; i++ )
         H_xor[i] = H_N[i] ^ H_g[i];
-    
+
     hash_init( alg, &ctx );
-    
+
     hash_update( alg, &ctx, H_xor, hash_len );
     hash_update( alg, &ctx, H_I,   hash_len );
-    update_hash_n( alg, &ctx, s );
+    hash_update( alg, &ctx, s_bytes, s_len );
     update_hash_n( alg, &ctx, A );
     update_hash_n( alg, &ctx, B );
     hash_update( alg, &ctx, K, hash_len );
-    
+
     hash_final( alg, &ctx, dest );
 }
 
-static void calculate_H_AMK( SRP_HashAlgorithm alg, unsigned char *dest, const BIGNUM * A, const unsigned char * M, const unsigned char * K )
+static void calculate_H_AMK( SRP_HashAlgorithm alg, unsigned char *dest, const mpz_t A, const unsigned char * M, const unsigned char * K )
 {
     HashCTX ctx;
-    
+
     hash_init( alg, &ctx );
-    
+
     update_hash_n( alg, &ctx, A );
     hash_update( alg, &ctx, M, hash_length(alg) );
     hash_update( alg, &ctx, K, hash_length(alg) );
-    
+
     hash_final( alg, &ctx, dest );
 }
 
+static int fill_buff()
+{
+    g_rand_idx = 0;
 
-static void init_random()
-{    
-    if (g_initialized)
-        return;
-    
 #ifdef WIN32
     HCRYPTPROV wctx;
 #else
     FILE   *fp   = 0;
 #endif
-    
-    unsigned char buff[64];
 
-    
 #ifdef WIN32
 
         CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
-        
-        CryptGenRandom(wctx, sizeof(buff), (BYTE*) buff);
-        
+
+        CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff);
+
         CryptReleaseContext(wctx, 0);
 
-        g_initialized = 1;
-        
+        return 1;
+
 #else
         fp = fopen("/dev/urandom", "r");
-        
+
         if (fp)
         {
-            fread(buff, sizeof(buff), 1, fp);
+            fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
             fclose(fp);
-            g_initialized = 1;
+            return 1;
         }
 #endif
+    return 0;
+}
 
+static void mpz_fill_random( mpz_t num )
+{
+    // was call: BN_rand(num, 256, -1, 0);
+    if (RAND_BUFF_MAX - g_rand_idx < 32)
+        fill_buff();
+    mpz_from_bin( (char *) (&g_rand_buff[g_rand_idx]), 32, num );
+    g_rand_idx += 32;
+}
+
+static void init_random()
+{
     if (g_initialized)
-       RAND_seed( buff, sizeof(buff) );
+        return;
+    g_initialized = fill_buff();
 }
 
 
@@ -452,103 +477,89 @@ static void init_random()
  *
  ***********************************************************************************************************/
 
-void srp_random_seed( const unsigned char * random_data, int data_length )
-{
-    g_initialized = 1;
-
-    if (random_data)
-        RAND_seed( random_data, data_length );
-}
-
-
-void srp_create_salted_verification_key( SRP_HashAlgorithm alg, 
-                                         SRP_NGType ng_type, const char * username,
+void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
+                                         SRP_NGType ng_type, const char * username_for_verifier,
                                          const unsigned char * password, int len_password,
-                                         const unsigned char ** bytes_s, int * len_s, 
+                                         const unsigned char ** bytes_s,  int * len_s,
                                          const unsigned char ** bytes_v, int * len_v,
                                          const char * n_hex, const char * g_hex )
 {
-    BIGNUM     * s   = BN_new();
-    BIGNUM     * v   = BN_new();
-    BIGNUM     * x   = 0;
-    BN_CTX     * ctx = BN_CTX_new();
+    mpz_t        v; mpz_init(v);
+    mpz_t        x; mpz_init(x);
     NGConstant * ng  = new_ng( ng_type, n_hex, g_hex );
 
-    if( !s || !v || !ctx || !ng )
+    if( !v || !ng )
        goto cleanup_and_exit;
 
-    init_random(); /* Only happens once */
-    
-    BN_rand(s, 32, -1, 0);
-    
-    x = calculate_x( alg, s, username, password, len_password );
+    if( bytes_s == NULL ) {
+        *len_s = 16;
+        if ( RAND_BUFF_MAX - g_rand_idx < 16 )
+            fill_buff();
+        *bytes_s = (const unsigned char *) malloc( sizeof(char) * 16 );
+        memcpy( (unsigned char *) *bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16 );
+        g_rand_idx += 16;
+    }
 
-    if( !x )
+
+    if( !calculate_x( x, alg, *bytes_s, *len_s, username_for_verifier, password, len_password ))
        goto cleanup_and_exit;
 
-    BN_mod_exp(v, ng->g, x, ng->N, ctx);
-        
-    *len_s   = BN_num_bytes(s);
-    *len_v   = BN_num_bytes(v);
-    
-    *bytes_s = (const unsigned char *) malloc( *len_s );
+    mpz_powm(v, ng->g, x, ng->N);
+
+    *len_v   = mpz_num_bytes(v);
+
     *bytes_v = (const unsigned char *) malloc( *len_v );
 
-    if (!bytes_s || !bytes_v)
+    if (!bytes_v)
        goto cleanup_and_exit;
-    
-    BN_bn2bin(s, (unsigned char *) *bytes_s);
-    BN_bn2bin(v, (unsigned char *) *bytes_v);
-    
+
+    mpz_to_bin(v, (unsigned char *) *bytes_v);
+
  cleanup_and_exit:
     delete_ng( ng );
-    BN_free(s);
-    BN_free(v);
-    BN_free(x);
-    BN_CTX_free(ctx);
+    mpz_clear(v);
+    mpz_clear(x);
 }
 
 
 
 /* Out: bytes_B, len_B.
- * 
+ *
  * On failure, bytes_B will be set to NULL and len_B will be set to 0
  */
 struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const char * username,
-                                        const unsigned char * bytes_s, int len_s, 
+                                        const unsigned char * bytes_s, int len_s,
                                         const unsigned char * bytes_v, int len_v,
                                         const unsigned char * bytes_A, int len_A,
                                         const unsigned char ** bytes_B, int * len_B,
                                         const char * n_hex, const char * g_hex )
 {
-    BIGNUM             *s    = BN_bin2bn(bytes_s, len_s, NULL);
-    BIGNUM             *v    = BN_bin2bn(bytes_v, len_v, NULL);
-    BIGNUM             *A    = BN_bin2bn(bytes_A, len_A, NULL);
-    BIGNUM             *u    = 0;
-    BIGNUM             *B    = BN_new();
-    BIGNUM             *S    = BN_new();
-    BIGNUM             *b    = BN_new();
-    BIGNUM             *k    = 0;
-    BIGNUM             *tmp1 = BN_new();
-    BIGNUM             *tmp2 = BN_new();
-    BN_CTX             *ctx  = BN_CTX_new();
-    int                 ulen = strlen(username) + 1;
-    NGConstant         *ng   = new_ng( ng_type, n_hex, g_hex );
-    struct SRPVerifier *ver  = 0;
+    mpz_t               v;    mpz_init(v); mpz_from_bin(bytes_v, len_v, v);
+    mpz_t               A;    mpz_init(A); mpz_from_bin(bytes_A, len_A, A);
+    mpz_t               u;    mpz_init(u);
+    mpz_t               B;    mpz_init(B);
+    mpz_t               S;    mpz_init(S);
+    mpz_t               b;    mpz_init(b);
+    mpz_t               k;    mpz_init(k);
+    mpz_t               tmp1; mpz_init(tmp1);
+    mpz_t               tmp2; mpz_init(tmp2);
+    int                 ulen  = strlen(username) + 1;
+    NGConstant         *ng    = new_ng( ng_type, n_hex, g_hex );
+    struct SRPVerifier *ver   = 0;
 
     *len_B   = 0;
     *bytes_B = 0;
-    
-    if( !s || !v || !A || !B || !S || !b || !tmp1 || !tmp2 || !ctx || !ng )
+
+    if( !v || !A || !B || !S || !b || !tmp1 || !tmp2  || !ng )
        goto cleanup_and_exit;
-    
+
     ver = (struct SRPVerifier *) malloc( sizeof(struct SRPVerifier) );
 
     if (!ver)
        goto cleanup_and_exit;
 
     init_random(); /* Only happens once */
-    
+
     ver->username = (char *) malloc( ulen );
     ver->hash_alg = alg;
     ver->ng       = ng;
@@ -559,39 +570,39 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
        ver = 0;
        goto cleanup_and_exit;
     }
-    
+
     memcpy( (char*)ver->username, username, ulen );
-    
+
     ver->authenticated = 0;
-        
+
     /* SRP-6a safety check */
-    BN_mod(tmp1, A, ng->N, ctx);
-    if ( !BN_is_zero(tmp1) )
+    mpz_mod(tmp1, A, ng->N);
+    if ( mpz_sgn(tmp1) != 0 )
     {
-       BN_rand(b, 256, -1, 0);
-       
-       k = H_nn(alg, ng->N, ng->g);
-       
+       mpz_fill_random(b);
+
+       H_nn(k, alg, ng->N, ng->g);
+
        /* B = kv + g^b */
-       BN_mul(tmp1, k, v, ctx);
-       BN_mod_exp(tmp2, ng->g, b, ng->N, ctx);
-       BN_add(B, tmp1, tmp2);
-       
-       u = H_nn(alg, A, B);
-       
+       mpz_mul(tmp1, k, v);
+       mpz_powm(tmp2, ng->g, b, ng->N);
+       mpz_add(B, tmp1, tmp2);
+
+       H_nn(u, alg, A, B);
+
        /* S = (A *(v^u)) ^ b */
-       BN_mod_exp(tmp1, v, u, ng->N, ctx);
-       BN_mul(tmp2, A, tmp1, ctx);
-       BN_mod_exp(S, tmp2, b, ng->N, ctx);
-       
+       mpz_powm(tmp1, v, u, ng->N);
+       mpz_mul(tmp2, A, tmp1);
+       mpz_powm(S, tmp2, b, ng->N);
+
        hash_num(alg, S, ver->session_key);
-       
-       calculate_M( alg, ng, ver->M, username, s, A, B, ver->session_key );
+
+       calculate_M( alg, ng, ver->M, username, bytes_s, len_s, A, B, ver->session_key );
        calculate_H_AMK( alg, ver->H_AMK, A, ver->M, ver->session_key );
-       
-       *len_B   = BN_num_bytes(B);
+
+       *len_B   = mpz_num_bytes(B);
        *bytes_B = malloc( *len_B );
-       
+
        if( !*bytes_B )
        {
           free( (void*) ver->username );
@@ -600,29 +611,27 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
           *len_B = 0;
           goto cleanup_and_exit;
        }
-       
-       BN_bn2bin( B, (unsigned char *) *bytes_B );
-          
+
+       mpz_to_bin( B, (unsigned char *) *bytes_B );
+
        ver->bytes_B = *bytes_B;
     }
-    
+
  cleanup_and_exit:
-    BN_free(s);
-    BN_free(v);
-    BN_free(A);
-    if (u) BN_free(u);
-    if (k) BN_free(k);
-    BN_free(B);
-    BN_free(S);
-    BN_free(b);
-    BN_free(tmp1);
-    BN_free(tmp2);
-    BN_CTX_free(ctx);
-    
+    mpz_clear(v);
+    mpz_clear(A);
+    if (u) mpz_clear(u);
+    if (k) mpz_clear(k);
+    mpz_clear(B);
+    mpz_clear(S);
+    mpz_clear(b);
+    mpz_clear(tmp1);
+    mpz_clear(tmp2);
+
     return ver;
 }
 
-                                        
+
 
 
 void srp_verifier_delete( struct SRPVerifier * ver )
@@ -679,50 +688,54 @@ void srp_verifier_verify_session( struct SRPVerifier * ver, const unsigned char 
 
 /*******************************************************************************/
 
-struct SRPUser * srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const char * username, 
+struct SRPUser * srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
+                               const char * username, const char * username_for_verifier,
                                const unsigned char * bytes_password, int len_password,
                                const char * n_hex, const char * g_hex )
 {
-    struct SRPUser  *usr  = (struct SRPUser *) malloc( sizeof(struct SRPUser) );
-    int              ulen = strlen(username) + 1;
+    struct SRPUser  *usr   = (struct SRPUser *) malloc( sizeof(struct SRPUser) );
+    int              ulen  = strlen(username) + 1;
+    int              uvlen = strlen(username_for_verifier) + 1;
 
     if (!usr)
        goto err_exit;
 
     init_random(); /* Only happens once */
-    
+
     usr->hash_alg = alg;
     usr->ng       = new_ng( ng_type, n_hex, g_hex );
-    
-    usr->a = BN_new();
-    usr->A = BN_new();
-    usr->S = BN_new();
+
+    mpz_init(usr->a);
+    mpz_init(usr->A);
+    mpz_init(usr->S);
 
     if (!usr->ng || !usr->a || !usr->A || !usr->S)
        goto err_exit;
-    
-    usr->username     = (const char *) malloc(ulen);
-    usr->password     = (const unsigned char *) malloc(len_password);
-    usr->password_len = len_password;
+
+    usr->username          = (const char *) malloc(ulen);
+    usr->username_verifier = (const char *) malloc(uvlen);
+    usr->password          = (const unsigned char *) malloc(len_password);
+    usr->password_len      = len_password;
 
     if (!usr->username || !usr->password)
        goto err_exit;
-    
-    memcpy((char *)usr->username, username,       ulen);
-    memcpy((char *)usr->password, bytes_password, len_password);
+
+    memcpy((char *)usr->username,          username,              ulen);
+    memcpy((char *)usr->username_verifier, username_for_verifier, uvlen);
+    memcpy((char *)usr->password,          bytes_password,        len_password);
 
     usr->authenticated = 0;
-    
+
     usr->bytes_A = 0;
-    
+
     return usr;
 
  err_exit:
     if (usr)
     {
-       BN_free(usr->a);
-       BN_free(usr->A);
-       BN_free(usr->S);
+       mpz_clear(usr->a);
+       mpz_clear(usr->A);
+       mpz_clear(usr->S);
        if (usr->username)
           free((void*)usr->username);
        if (usr->password)
@@ -732,7 +745,7 @@ struct SRPUser * srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const 
        }
        free(usr);
     }
-    
+
     return 0;
 }
 
@@ -742,18 +755,18 @@ void srp_user_delete( struct SRPUser * usr )
 {
    if( usr )
    {
-      BN_free( usr->a );
-      BN_free( usr->A );
-      BN_free( usr->S );
-      
+      mpz_clear( usr->a );
+      mpz_clear( usr->A );
+      mpz_clear( usr->S );
+
       delete_ng( usr->ng );
 
       memset((void*)usr->password, 0, usr->password_len);
-      
+
       free((char *)usr->username);
       free((char *)usr->password);
-      
-      if (usr->bytes_A) 
+
+      if (usr->bytes_A)
          free( (char *)usr->bytes_A );
 
       memset(usr, 0, sizeof(*usr));
@@ -792,18 +805,15 @@ int                   srp_user_get_session_key_length( struct SRPUser * usr )
 
 
 /* Output: username, bytes_A, len_A */
-void  srp_user_start_authentication( struct SRPUser * usr, const char ** username, 
+void  srp_user_start_authentication( struct SRPUser * usr, const char ** username,
                                      const unsigned char ** bytes_A, int * len_A )
 {
-    BN_CTX  *ctx  = BN_CTX_new();
-    
-    BN_rand(usr->a, 256, -1, 0);
-        
-    BN_mod_exp(usr->A, usr->ng->g, usr->a, usr->ng->N, ctx);
-        
-    BN_CTX_free(ctx);
-    
-    *len_A   = BN_num_bytes(usr->A);
+
+    mpz_fill_random(usr->a);
+
+    mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
+
+    *len_A   = mpz_num_bytes(usr->A);
     *bytes_A = malloc( *len_A );
 
     if (!*bytes_A)
@@ -813,70 +823,66 @@ void  srp_user_start_authentication( struct SRPUser * usr, const char ** usernam
        *username = 0;
        return;
     }
-        
-    BN_bn2bin( usr->A, (unsigned char *) *bytes_A );
-    
+
+    mpz_to_bin( usr->A, (unsigned char *) *bytes_A );
+
     usr->bytes_A = *bytes_A;
     *username = usr->username;
 }
 
 
 /* Output: bytes_M. Buffer length is SHA512_DIGEST_LENGTH */
-void  srp_user_process_challenge( struct SRPUser * usr, 
-                                  const unsigned char * bytes_s, int len_s, 
+void  srp_user_process_challenge( struct SRPUser * usr,
+                                  const unsigned char * bytes_s, int len_s,
                                   const unsigned char * bytes_B, int len_B,
                                   const unsigned char ** bytes_M, int * len_M )
 {
-    BIGNUM *s    = BN_bin2bn(bytes_s, len_s, NULL);
-    BIGNUM *B    = BN_bin2bn(bytes_B, len_B, NULL);
-    BIGNUM *u    = 0;
-    BIGNUM *x    = 0;
-    BIGNUM *k    = 0;
-    BIGNUM *v    = BN_new();
-    BIGNUM *tmp1 = BN_new();
-    BIGNUM *tmp2 = BN_new();
-    BIGNUM *tmp3 = BN_new();
-    BN_CTX *ctx  = BN_CTX_new();
+    mpz_t B;    mpz_init(B); mpz_from_bin(bytes_B, len_B, B);
+    mpz_t u;    mpz_init(u);
+    mpz_t x;    mpz_init(x);
+    mpz_t k;    mpz_init(k);
+    mpz_t v;    mpz_init(v);
+    mpz_t tmp1; mpz_init(tmp1);
+    mpz_t tmp2; mpz_init(tmp2);
+    mpz_t tmp3; mpz_init(tmp3);
 
     *len_M = 0;
     *bytes_M = 0;
 
-    if( !s || !B || !v || !tmp1 || !tmp2 || !tmp3 || !ctx )
+    if( !B || !u || !x || !k || !v || !tmp1 || !tmp2 || !tmp3 )
        goto cleanup_and_exit;
-    
-    u = H_nn(usr->hash_alg, usr->A, B);
 
-    if (!u)
+    if (!H_nn(u, usr->hash_alg, usr->A, B))
        goto cleanup_and_exit;
-    
-    x = calculate_x( usr->hash_alg, s, usr->username, usr->password, usr->password_len );
+
+    calculate_x( x, usr->hash_alg, bytes_s, len_s, usr->username_verifier, usr->password, usr->password_len );
 
     if (!x)
        goto cleanup_and_exit;
-    
-    k = H_nn(usr->hash_alg, usr->ng->N, usr->ng->g);
+
+    H_nn(k, usr->hash_alg, usr->ng->N, usr->ng->g);
 
     if (!k)
        goto cleanup_and_exit;
-    
+
     /* SRP-6a safety check */
-    if ( !BN_is_zero(B) && !BN_is_zero(u) )
+    if ( mpz_sgn(B) != 0 && mpz_sgn(u) != 0 )
     {
-        BN_mod_exp(v, usr->ng->g, x, usr->ng->N, ctx);
-        
+        mpz_powm(v, usr->ng->g, x, usr->ng->N);
+
         /* S = (B - k*(g^x)) ^ (a + ux) */
-        BN_mul(tmp1, u, x, ctx);
-        BN_add(tmp2, usr->a, tmp1);             /* tmp2 = (a + ux)      */
-        BN_mod_exp(tmp1, usr->ng->g, x, usr->ng->N, ctx);
-        BN_mul(tmp3, k, tmp1, ctx);             /* tmp3 = k*(g^x)       */
-        BN_sub(tmp1, B, tmp3);                  /* tmp1 = (B - K*(g^x)) */
-        BN_mod_exp(usr->S, tmp1, tmp2, usr->ng->N, ctx);
+        mpz_mul(tmp1, u, x);
+        mpz_add(tmp2, usr->a, tmp1);            /* tmp2 = (a + ux)      */
+        mpz_powm(tmp1, usr->ng->g, x, usr->ng->N);
+        mpz_mul(tmp3, k, tmp1);                 /* tmp3 = k*(g^x)       */
+        mpz_sub(tmp1, B, tmp3);                 /* tmp1 = (B - K*(g^x)) */
+        mpz_powm(usr->S, tmp1, tmp2, usr->ng->N);
 
         hash_num(usr->hash_alg, usr->S, usr->session_key);
-        
-        calculate_M( usr->hash_alg, usr->ng, usr->M, usr->username, s, usr->A, B, usr->session_key );
+
+        calculate_M( usr->hash_alg, usr->ng, usr->M, usr->username, bytes_s, len_s, usr->A, B, usr->session_key );
         calculate_H_AMK( usr->hash_alg, usr->H_AMK, usr->A, usr->M, usr->session_key );
-        
+
         *bytes_M = usr->M;
         if (len_M)
             *len_M = hash_length( usr->hash_alg );
@@ -884,24 +890,22 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     else
     {
         *bytes_M = NULL;
-        if (len_M) 
+        if (len_M)
             *len_M   = 0;
     }
 
  cleanup_and_exit:
-    
-    BN_free(s);
-    BN_free(B);
-    BN_free(u);
-    BN_free(x);
-    BN_free(k);
-    BN_free(v);
-    BN_free(tmp1);
-    BN_free(tmp2);
-    BN_free(tmp3);
-    BN_CTX_free(ctx);
+
+    mpz_clear(B);
+    mpz_clear(u);
+    mpz_clear(x);
+    mpz_clear(k);
+    mpz_clear(v);
+    mpz_clear(tmp1);
+    mpz_clear(tmp2);
+    mpz_clear(tmp3);
 }
-                                                  
+
 
 void srp_user_verify_session( struct SRPUser * usr, const unsigned char * bytes_HAMK )
 {
