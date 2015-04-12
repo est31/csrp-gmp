@@ -290,17 +290,17 @@ static int hash_length( SRP_HashAlgorithm alg )
     };
 }
 
-inline int mpz_num_bytes( const mpz_t op )
+inline static int mpz_num_bytes( const mpz_t op )
 {
     return (mpz_sizeinbase (op, 2) + 7) / 8;
 }
 
-inline void mpz_to_bin( const mpz_t op, unsigned char * to )
+inline static void mpz_to_bin( const mpz_t op, unsigned char * to )
 {
     mpz_export(to, NULL, 1, 1, 1, 0, op);
 }
 
-inline void mpz_from_bin( const unsigned char * s, int len, mpz_t ret )
+inline static void mpz_from_bin( const unsigned char * s, int len, mpz_t ret )
 {
     mpz_import(ret, len, 1, 1, 1, 0, s);
 }
