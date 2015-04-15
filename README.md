@@ -37,8 +37,9 @@ Porter's notes
 Compared with [csrp](https://github.com/cocagne/csrp), some things
 have changed for the outside.
 As LibGMP doesn't ship with a cryptographically strong PRNG, strong
-PRNGs provided (and seeded) by the OS are used instead. On unix-based
-operating systems, you should ensure that /dev/urandom is readable.
+PRNGs provided (and seeded) by the OS are used instead. On non-Windows
+operating systems, you should ensure that /dev/urandom is readable,
+or customize random generation in `fill_buff`.
 The call `srp_random_seed` has been removed.
 
 The call `srp_user_new` has a new parameter, `username_for_verifier`,
