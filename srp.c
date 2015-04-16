@@ -305,18 +305,45 @@ inline static void mpz_from_bin( const unsigned char * s, int len, mpz_t ret )
     mpz_import(ret, len, 1, 1, 1, 0, s);
 }
 
-static int H_nn( mpz_t result, SRP_HashAlgorithm alg, const mpz_t n1, const mpz_t n2 )
+// set op to (op1 * op2) mod d, using tmp for the calculation
+inline static void mpz_mulm( mpz_t op, const mpz_t op1, const mpz_t op2, const mpz_t d, mpz_t tmp )
+{
+    mpz_mul( tmp, op1, op2 );
+    mpz_mod( op, tmp, d );
+}
+
+// set op to (op1 + op2) mod d, using tmp for the calculation
+inline static void mpz_addm( mpz_t op, const mpz_t op1, const mpz_t op2, const mpz_t d, mpz_t tmp )
+{
+    mpz_add( tmp, op1, op2 );
+    mpz_mod( op, tmp, d );
+}
+
+// set op to (op1 - op2) mod d, using tmp for the calculation
+inline static void mpz_subm( mpz_t op, const mpz_t op1, const mpz_t op2, const mpz_t d, mpz_t tmp )
+{
+    mpz_sub( tmp, op1, op2 );
+    mpz_mod( op, tmp, d );
+}
+
+static int H_nn( mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t n1, const mpz_t n2 )
 {
     unsigned char   buff[ SHA512_DIGEST_LENGTH ];
+    int             len_N  = mpz_num_bytes(N);
     int             len_n1 = mpz_num_bytes(n1);
     int             len_n2 = mpz_num_bytes(n2);
     int             nbytes = len_n1 + len_n2;
     unsigned char * bin    = (unsigned char *) malloc( nbytes );
-    if (!bin) {
+    if (!bin)
        return 0;
+    if (len_n1 > len_N || len_n2 > len_N)
+    {
+        free(bin);
+        return 0;
     }
-    mpz_to_bin(n1, bin);
-    mpz_to_bin(n2, bin + len_n1);
+    memset(bin, 0, nbytes);
+    mpz_to_bin(n1, bin + (len_N - len_n1));
+    mpz_to_bin(n2, bin + (len_N + len_N - len_n2));
     hash( alg, bin, nbytes, buff );
     free(bin);
     mpz_from_bin(buff, hash_length(alg), result);
@@ -543,6 +570,7 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
     mpz_t               k;    mpz_init(k);
     mpz_t               tmp1; mpz_init(tmp1);
     mpz_t               tmp2; mpz_init(tmp2);
+    mpz_t               tmp3; mpz_init(tmp3);
     int                 ulen  = strlen(username) + 1;
     NGConstant         *ng    = new_ng( ng_type, n_hex, g_hex );
     struct SRPVerifier *ver   = 0;
@@ -581,18 +609,28 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
     {
        mpz_fill_random(b);
 
-       H_nn(k, alg, ng->N, ng->g);
+       if (!H_nn(k, alg, ng->N, ng->N, ng->g))
+       {
+          free(ver);
+          ver = 0;
+          goto cleanup_and_exit;
+       }
 
        /* B = kv + g^b */
-       mpz_mul(tmp1, k, v);
+       mpz_mulm(tmp1, k, v, ng->N, tmp3);
        mpz_powm(tmp2, ng->g, b, ng->N);
-       mpz_add(B, tmp1, tmp2);
+       mpz_addm(B, tmp1, tmp2, ng->N, tmp3);
 
-       H_nn(u, alg, A, B);
+       if (!H_nn(u, alg, ng->N, A, B))
+       {
+          free(ver);
+          ver = 0;
+          goto cleanup_and_exit;
+       }
 
        /* S = (A *(v^u)) ^ b */
        mpz_powm(tmp1, v, u, ng->N);
-       mpz_mul(tmp2, A, tmp1);
+       mpz_mulm(tmp2, A, tmp1, ng->N, tmp3);
        mpz_powm(S, tmp2, b, ng->N);
 
        hash_num(alg, S, ver->session_key);
@@ -615,6 +653,9 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
        mpz_to_bin( B, (unsigned char *) *bytes_B );
 
        ver->bytes_B = *bytes_B;
+    } else {
+       free(ver);
+       ver = 0;
     }
 
  cleanup_and_exit:
@@ -627,6 +668,7 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
     mpz_clear(b);
     mpz_clear(tmp1);
     mpz_clear(tmp2);
+    mpz_clear(tmp3);
 
     return ver;
 }
@@ -845,6 +887,7 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     mpz_t tmp1; mpz_init(tmp1);
     mpz_t tmp2; mpz_init(tmp2);
     mpz_t tmp3; mpz_init(tmp3);
+    mpz_t tmp4; mpz_init(tmp4);
 
     *len_M = 0;
     *bytes_M = 0;
@@ -852,7 +895,7 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     if( !B || !u || !x || !k || !v || !tmp1 || !tmp2 || !tmp3 )
        goto cleanup_and_exit;
 
-    if (!H_nn(u, usr->hash_alg, usr->A, B))
+    if (!H_nn(u, usr->hash_alg, usr->ng->N, usr->A, B))
        goto cleanup_and_exit;
 
     calculate_x( x, usr->hash_alg, bytes_s, len_s, usr->username_verifier, usr->password, usr->password_len );
@@ -860,9 +903,7 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     if (!x)
        goto cleanup_and_exit;
 
-    H_nn(k, usr->hash_alg, usr->ng->N, usr->ng->g);
-
-    if (!k)
+    if (!H_nn(k, usr->hash_alg, usr->ng->N, usr->ng->N, usr->ng->g))
        goto cleanup_and_exit;
 
     /* SRP-6a safety check */
@@ -872,10 +913,10 @@ void  srp_user_process_challenge( struct SRPUser * usr,
 
         /* S = (B - k*(g^x)) ^ (a + ux) */
         mpz_mul(tmp1, u, x);
-        mpz_add(tmp2, usr->a, tmp1);            /* tmp2 = (a + ux)      */
-        mpz_powm(tmp1, usr->ng->g, x, usr->ng->N);
-        mpz_mul(tmp3, k, tmp1);                 /* tmp3 = k*(g^x)       */
-        mpz_sub(tmp1, B, tmp3);                 /* tmp1 = (B - K*(g^x)) */
+        mpz_add(tmp2, usr->a, tmp1);               /* tmp2 = (a + ux)      */
+        mpz_powm(tmp1, usr->ng->g, x, usr->ng->N); /* tmp1 = g^x           */
+        mpz_mulm(tmp3, k, tmp1, usr->ng->N, tmp4); /* tmp3 = k*(g^x)       */
+        mpz_subm(tmp1, B, tmp3, usr->ng->N, tmp4); /* tmp1 = (B - K*(g^x)) */
         mpz_powm(usr->S, tmp1, tmp2, usr->ng->N);
 
         hash_num(usr->hash_alg, usr->S, usr->session_key);
@@ -904,6 +945,7 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     mpz_clear(tmp1);
     mpz_clear(tmp2);
     mpz_clear(tmp3);
+    mpz_clear(tmp4);
 }
 
 
