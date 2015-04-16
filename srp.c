@@ -514,7 +514,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
     mpz_t        x; mpz_init(x);
     NGConstant * ng  = new_ng( ng_type, n_hex, g_hex );
 
-    if( !v || !ng )
+    if( !ng )
        goto cleanup_and_exit;
 
     if( bytes_s == NULL ) {
@@ -577,7 +577,7 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
     *len_B   = 0;
     *bytes_B = 0;
 
-    if( !v || !A || !B || !S || !b || !tmp1 || !tmp2  || !ng )
+    if( !ng )
        goto cleanup_and_exit;
 
     ver = (struct SRPVerifier *) malloc( sizeof(struct SRPVerifier) );
@@ -638,7 +638,7 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
        calculate_H_AMK( alg, ver->H_AMK, A, ver->M, ver->session_key );
 
        *len_B   = mpz_num_bytes(B);
-       *bytes_B = malloc( *len_B );
+       *bytes_B = (const unsigned char *) malloc( *len_B );
 
        if( !*bytes_B )
        {
@@ -660,8 +660,8 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
  cleanup_and_exit:
     mpz_clear(v);
     mpz_clear(A);
-    if (u) mpz_clear(u);
-    if (k) mpz_clear(k);
+    mpz_clear(u);
+    mpz_clear(k);
     mpz_clear(B);
     mpz_clear(S);
     mpz_clear(b);
@@ -855,7 +855,7 @@ void  srp_user_start_authentication( struct SRPUser * usr, const char ** usernam
     mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
 
     *len_A   = mpz_num_bytes(usr->A);
-    *bytes_A = malloc( *len_A );
+    *bytes_A = (const unsigned char *) malloc( *len_A );
 
     if (!*bytes_A)
     {
@@ -891,15 +891,10 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     *len_M = 0;
     *bytes_M = 0;
 
-    if( !B || !u || !x || !k || !v || !tmp1 || !tmp2 || !tmp3 )
-       goto cleanup_and_exit;
-
     if (!H_nn(u, usr->hash_alg, usr->ng->N, usr->A, B))
        goto cleanup_and_exit;
 
-    calculate_x( x, usr->hash_alg, bytes_s, len_s, usr->username_verifier, usr->password, usr->password_len );
-
-    if (!x)
+    if (!calculate_x( x, usr->hash_alg, bytes_s, len_s, usr->username_verifier, usr->password, usr->password_len ))
        goto cleanup_and_exit;
 
     if (!H_nn(k, usr->hash_alg, usr->ng->N, usr->ng->N, usr->ng->g))
