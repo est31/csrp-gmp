@@ -1,11 +1,10 @@
 /*
  * Secure Remote Password 6a implementation
- * Copyright (c) 2010 Tom Cocagne. All rights reserved.
- * https://github.com/cocagne/csrp
+ * https://github.com/est31/csrp-gmp
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013 Tom Cocagne, 2015 est31 <MTest31@outlook.com>
+ * Copyright (c) 2010, 2013 Tom Cocagne, 2015 est31 <MTest31@outlook.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
