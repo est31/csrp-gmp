@@ -331,7 +331,7 @@ static int H_nn( mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t
     int             len_N  = mpz_num_bytes(N);
     int             len_n1 = mpz_num_bytes(n1);
     int             len_n2 = mpz_num_bytes(n2);
-    int             nbytes = len_n1 + len_n2;
+    int             nbytes = len_N + len_N;
     unsigned char * bin    = (unsigned char *) malloc( nbytes );
     if (!bin)
        return 0;
@@ -779,6 +779,8 @@ struct SRPUser * srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
        mpz_clear(usr->S);
        if (usr->username)
           free((void*)usr->username);
+       if (usr->username_verifier)
+          free((void*)usr->username_verifier);
        if (usr->password)
        {
           memset((void*)usr->password, 0, usr->password_len);
@@ -805,6 +807,7 @@ void srp_user_delete( struct SRPUser * usr )
       memset((void*)usr->password, 0, usr->password_len);
 
       free((char *)usr->username);
+      free((char *)usr->username_verifier);
       free((char *)usr->password);
 
       if (usr->bytes_A)
