@@ -868,7 +868,8 @@ void  srp_user_start_authentication( struct SRPUser * usr, const char ** usernam
     mpz_to_bin( usr->A, (unsigned char *) *bytes_A );
 
     usr->bytes_A = *bytes_A;
-    *username = usr->username;
+    if ( username )
+       *username = usr->username;
 }
 
 
