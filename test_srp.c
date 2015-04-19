@@ -48,7 +48,8 @@ int main( int argc, char * argv[] )
     unsigned long long start;
     unsigned long long duration;
 
-    const char * username = "testuser";
+    const char * username = "TestUser";
+    const char * ver_unam = "testuser";
     const char * password = "password";
 
     const char * n_hex         = 0;
@@ -64,7 +65,7 @@ int main( int argc, char * argv[] )
     }
 
 
-    srp_create_salted_verification_key( alg, ng_type, username,
+    srp_create_salted_verification_key( alg, ng_type, ver_unam,
                 (const unsigned char *)password,
                 strlen(password),
                 &bytes_s, &len_s, &bytes_v, &len_v, n_hex, g_hex );
@@ -75,7 +76,7 @@ int main( int argc, char * argv[] )
 
     for( i = 0; i < NITER; i++ )
     {
-        usr =  srp_user_new( alg, ng_type, username, username,
+        usr =  srp_user_new( alg, ng_type, username, ver_unam,
                              (const unsigned char *)password,
                              strlen(password), n_hex, g_hex );
 
