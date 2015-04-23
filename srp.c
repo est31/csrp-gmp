@@ -41,6 +41,8 @@
 
 #include "srp.h"
 
+#define srp_dbg_data(data, datalen, prevtext) ;
+
 static int g_initialized = 0;
 
 #define RAND_BUFF_MAX 128
@@ -371,6 +373,9 @@ static int calculate_x( mpz_t result, SRP_HashAlgorithm alg, const unsigned char
 
     hash_init( alg, &ctx );
 
+    srp_dbg_data((char*) username, strlen(username), "Username for x: ");
+    srp_dbg_data((char*) password, password_len, "Password for x: ");
+
     hash_update( alg, &ctx, username, strlen(username) );
     hash_update( alg, &ctx, ":", 1 );
     hash_update( alg, &ctx, password, password_len );
@@ -496,6 +501,7 @@ static void init_random()
     g_initialized = fill_buff();
 }
 
+#define srp_dbg_num(num, text) ;
 
 /***********************************************************************************************************
  *
@@ -529,6 +535,8 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 
     if( !calculate_x( x, alg, *bytes_s, *len_s, username_for_verifier, password, len_password ))
        goto cleanup_and_exit;
+
+    srp_dbg_num(x, "Server calculated x: ");
 
     mpz_powm(v, ng->g, x, ng->N);
 
@@ -626,6 +634,8 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
           ver = 0;
           goto cleanup_and_exit;
        }
+
+       srp_dbg_num(u, "Server calculated u: ");
 
        /* S = (A *(v^u)) ^ b */
        mpz_powm(tmp1, v, u, ng->N);
@@ -898,8 +908,12 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     if (!H_nn(u, usr->hash_alg, usr->ng->N, usr->A, B))
        goto cleanup_and_exit;
 
+    srp_dbg_num(u, "Client calculated u: ");
+
     if (!calculate_x( x, usr->hash_alg, bytes_s, len_s, usr->username_verifier, usr->password, usr->password_len ))
        goto cleanup_and_exit;
+
+    srp_dbg_num(x, "Client calculated x: ");
 
     if (!H_nn(k, usr->hash_alg, usr->ng->N, usr->ng->N, usr->ng->g))
        goto cleanup_and_exit;
@@ -908,6 +922,8 @@ void  srp_user_process_challenge( struct SRPUser * usr,
     if ( mpz_sgn(B) != 0 && mpz_sgn(u) != 0 )
     {
         mpz_powm(v, usr->ng->g, x, usr->ng->N);
+
+        srp_dbg_num(v, "Client calculated v: ");
 
         /* S = (B - k*(g^x)) ^ (a + ux) */
         mpz_mul(tmp1, u, x);
