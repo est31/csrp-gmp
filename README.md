@@ -44,13 +44,16 @@ The call `srp_random_seed` has been removed.
 
 The call `srp_user_new` has a new parameter, `username_for_verifier`,
 allowing to use different usernames for verifier and srp login.
+Also, `srp_user_start_authentication` and `srp_verifier_new` have new
+parameters to specify `a` and `b` values.
 
 Added option for `srp_create_salted_verification_key` call to specify
 a salt.
 
-We ship with OpenSSL's implementation of the SHA256 hash algorithm.
-Support for other hash algoritms was dropped (but re-introducing is
-fairly easy, just copy from an OpenSSL source distribution).
+We ship with OpenSSL's implementation of the SHA256 and SHA-1 hash
+algorithms. Support for other hash algoritms was dropped (but
+re-introducing is fairly easy, just copy from an OpenSSL source
+distribution).
 
 Usage Example
 -------------

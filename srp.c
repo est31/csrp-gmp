@@ -37,11 +37,21 @@
 #include <stdio.h>
 
 #include <gmp.h>
-#include <sha/sha2.h>
+#include <sha/sha.h>
 
 #include "srp.h"
 
 #define srp_dbg_data(data, datalen, prevtext) ;
+/*void srp_dbg_data(unsigned char * data, int datalen, char * prevtext)
+{
+    printf(prevtext);
+    int i;
+    for (i = 0; i < datalen; i++)
+    {
+        printf("%02X", data[i]);
+    }
+    printf("\n");
+}*/
 
 static int g_initialized = 0;
 
@@ -229,8 +239,8 @@ static int hash_init( SRP_HashAlgorithm alg, HashCTX *c )
 {
     switch (alg)
     {
-      /*case SRP_SHA1  : return SHA1_Init( &c->sha );
-      case SRP_SHA224: return SHA224_Init( &c->sha256 );*/
+      case SRP_SHA1  : return SHA1_Init( &c->sha );
+      /*case SRP_SHA224: return SHA224_Init( &c->sha256 );*/
       case SRP_SHA256: return SHA256_Init( &c->sha256 );
       /*case SRP_SHA384: return SHA384_Init( &c->sha512 );
       case SRP_SHA512: return SHA512_Init( &c->sha512 );*/
@@ -242,8 +252,8 @@ static int hash_update( SRP_HashAlgorithm alg, HashCTX *c, const void *data, siz
 {
     switch (alg)
     {
-      /*case SRP_SHA1  : return SHA1_Update( &c->sha, data, len );
-      case SRP_SHA224: return SHA224_Update( &c->sha256, data, len );*/
+      case SRP_SHA1  : return SHA1_Update( &c->sha, data, len );
+      /*case SRP_SHA224: return SHA224_Update( &c->sha256, data, len );*/
       case SRP_SHA256: return SHA256_Update( &c->sha256, data, len );
       /*case SRP_SHA384: return SHA384_Update( &c->sha512, data, len );
       case SRP_SHA512: return SHA512_Update( &c->sha512, data, len );*/
@@ -255,8 +265,8 @@ static int hash_final( SRP_HashAlgorithm alg, HashCTX *c, unsigned char *md )
 {
     switch (alg)
     {
-      /*case SRP_SHA1  : return SHA1_Final( md, &c->sha );
-      case SRP_SHA224: return SHA224_Final( md, &c->sha256 );*/
+      case SRP_SHA1  : return SHA1_Final( md, &c->sha );
+      /*case SRP_SHA224: return SHA224_Final( md, &c->sha256 );*/
       case SRP_SHA256: return SHA256_Final( md, &c->sha256 );
       /*case SRP_SHA384: return SHA384_Final( md, &c->sha512 );
       case SRP_SHA512: return SHA512_Final( md, &c->sha512 );*/
@@ -268,8 +278,8 @@ static unsigned char * hash( SRP_HashAlgorithm alg, const unsigned char *d, size
 {
     switch (alg)
     {
-      /*case SRP_SHA1  : return SHA1( d, n, md );
-      case SRP_SHA224: return SHA224( d, n, md );*/
+      case SRP_SHA1  : return SHA1( d, n, md );
+      /*case SRP_SHA224: return SHA224( d, n, md );*/
       case SRP_SHA256: return SHA256( d, n, md );
       /*case SRP_SHA384: return SHA384( d, n, md );
       case SRP_SHA512: return SHA512( d, n, md );*/
@@ -281,8 +291,8 @@ static int hash_length( SRP_HashAlgorithm alg )
 {
     switch (alg)
     {
-      /*case SRP_SHA1  : return SHA_DIGEST_LENGTH;
-      case SRP_SHA224: return SHA224_DIGEST_LENGTH;*/
+      case SRP_SHA1  : return SHA_DIGEST_LENGTH;
+      /*case SRP_SHA224: return SHA224_DIGEST_LENGTH;*/
       case SRP_SHA256: return SHA256_DIGEST_LENGTH;
       /*case SRP_SHA384: return SHA384_DIGEST_LENGTH;
       case SRP_SHA512: return SHA512_DIGEST_LENGTH;*/
@@ -502,6 +512,15 @@ static void init_random()
 }
 
 #define srp_dbg_num(num, text) ;
+/*void srp_dbg_num(mpz_t num, char * prevtext)
+{
+    int len_num = mpz_num_bytes(num);
+    char *bytes_num = (char*) malloc(len_num);
+    mpz_to_bin(num, (unsigned char *) bytes_num);
+    srp_dbg_data(bytes_num, len_num, prevtext);
+    free(bytes_num);
+
+}*/
 
 /***********************************************************************************************************
  *
@@ -565,6 +584,7 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
                                         const unsigned char * bytes_s, int len_s,
                                         const unsigned char * bytes_v, int len_v,
                                         const unsigned char * bytes_A, int len_A,
+                                        const unsigned char * bytes_b, int len_b,
                                         const unsigned char ** bytes_B, int * len_B,
                                         const char * n_hex, const char * g_hex )
 {
@@ -614,7 +634,12 @@ struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_typ
     mpz_mod(tmp1, A, ng->N);
     if ( mpz_sgn(tmp1) != 0 )
     {
-       mpz_fill_random(b);
+       if (bytes_b)
+       {
+           mpz_from_bin(bytes_b, len_b, b);
+       } else {
+           mpz_fill_random(b);
+       }
 
        if (!H_nn(k, alg, ng->N, ng->N, ng->g))
        {
@@ -860,10 +885,15 @@ int                   srp_user_get_session_key_length( struct SRPUser * usr )
 
 /* Output: username, bytes_A, len_A */
 void  srp_user_start_authentication( struct SRPUser * usr, const char ** username,
+                                     const unsigned char  * bytes_a, int   len_a,
                                      const unsigned char ** bytes_A, int * len_A )
 {
-
-    mpz_fill_random(usr->a);
+    if (bytes_a)
+    {
+        mpz_from_bin(bytes_a, len_a, usr->a);
+    } else {
+        mpz_fill_random(usr->a);
+    }
 
     mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
 

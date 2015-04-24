@@ -71,8 +71,8 @@ typedef enum
 
 typedef enum
 {
-    /*SRP_SHA1,
-    SRP_SHA224,*/
+    SRP_SHA1,
+    /*SRP_SHA224,*/
     SRP_SHA256,
     /*SRP_SHA384,
     SRP_SHA512*/
@@ -99,11 +99,14 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
  * On failure, bytes_B will be set to NULL and len_B will be set to 0
  *
  * The n_hex and g_hex parameters should be 0 unless SRP_NG_CUSTOM is used for ng_type
+ *
+ * If bytes_b == NULL, random data is used for b.
  */
 struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const char * username,
                                         const unsigned char * bytes_s, int len_s,
                                         const unsigned char * bytes_v, int len_v,
                                         const unsigned char * bytes_A, int len_A,
+                                        const unsigned char * bytes_b, int len_b,
                                         const unsigned char ** bytes_B, int * len_B,
                                         const char * n_hex, const char * g_hex );
 
@@ -148,8 +151,10 @@ const unsigned char * srp_user_get_session_key( struct SRPUser * usr, int * key_
 
 int                   srp_user_get_session_key_length( struct SRPUser * usr );
 
-/* Output: username, bytes_A, len_A. If you don't want it get written, set username to NULL */
+/* Output: username, bytes_A, len_A. If you don't want it get written, set username to NULL.
+ * If bytes_a == NULL, random data is used for a. */
 void                  srp_user_start_authentication( struct SRPUser * usr, const char ** username,
+                                                     const unsigned char  * bytes_a, int   len_a,
                                                      const unsigned char ** bytes_A, int * len_A );
 
 /* Output: bytes_M, len_M  (len_M may be null and will always be
