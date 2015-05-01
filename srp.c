@@ -462,37 +462,67 @@ static void calculate_H_AMK( SRP_HashAlgorithm alg, unsigned char *dest, const m
     hash_final( alg, &ctx, dest );
 }
 
+
+struct srp_pcgrandom {
+	unsigned long long int m_state;
+	unsigned long long int m_inc;
+}; typedef struct srp_pcgrandom srp_pcgrandom;
+
+static unsigned long int srp_pcgrandom_next(srp_pcgrandom *r)
+{
+	unsigned long long int oldstate = r->m_state;
+	r->m_state = oldstate * 6364136223846793005ULL + r->m_inc;
+
+	unsigned long int xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+	unsigned long int rot = oldstate >> 59u;
+	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+}
+
+static srp_pcgrandom_seed(srp_pcgrandom *r, unsigned long long int state,
+	unsigned long long int  seq)
+{
+	r->m_state = 0U;
+	r->m_inc = (seq << 1u) | 1u;
+	srp_pcgrandom_next(r);
+	r->m_state += state;
+	srp_pcgrandom_next(r);
+}
+
+
 static int fill_buff()
 {
-    g_rand_idx = 0;
+	g_rand_idx = 0;
 
 #ifdef WIN32
-    HCRYPTPROV wctx;
+	HCRYPTPROV wctx;
 #else
-    FILE   *fp   = 0;
+	FILE   *fp   = 0;
 #endif
 
 #ifdef WIN32
 
-        CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+	CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+	CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff);
+	CryptReleaseContext(wctx, 0);
 
-        CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff);
-
-        CryptReleaseContext(wctx, 0);
-
-        return 1;
+	return 1;
 
 #else
-        fp = fopen("/dev/urandom", "r");
+	fp = fopen("/dev/urandom", "r");
 
-        if (fp)
-        {
-            fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
-            fclose(fp);
-            return 1;
-        }
+	if (fp) {
+		fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
+		fclose(fp);
+	} else {
+		srp_pcgrandom *r = malloc(sizeof(srp_pcgrandom));
+		srp_pcgrandom_seed(r, time(NULL) ^ clock(), 0xda3e39cb94b95bdbULL);
+		size_t i = 0;
+		for (i = 0; i < RAND_BUFF_MAX; i++) {
+			g_rand_buff[i] = srp_pcgrandom_next(r);
+		}
+	}
 #endif
-    return 0;
+	return 1;
 }
 
 static void mpz_fill_random( mpz_t num )
