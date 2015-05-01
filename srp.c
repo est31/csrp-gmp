@@ -27,9 +27,9 @@
  */
 
 #ifdef WIN32
-    #include <Wincrypt.h>
+    #define _CRT_RAND_S
 #else
-    #include <sys/time.h>
+	#include <time.h>
 #endif
 
 #include <stdlib.h>
@@ -478,7 +478,7 @@ static unsigned long int srp_pcgrandom_next(srp_pcgrandom *r)
 	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
 }
 
-static srp_pcgrandom_seed(srp_pcgrandom *r, unsigned long long int state,
+static void srp_pcgrandom_seed(srp_pcgrandom *r, unsigned long long int state,
 	unsigned long long int  seq)
 {
 	r->m_state = 0U;
@@ -496,7 +496,7 @@ static int fill_buff()
 #ifdef WIN32
 	HCRYPTPROV wctx;
 #else
-	FILE   *fp   = 0;
+	FILE *fp = 0;
 #endif
 
 #ifdef WIN32
@@ -514,7 +514,7 @@ static int fill_buff()
 		fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
 		fclose(fp);
 	} else {
-		srp_pcgrandom *r = malloc(sizeof(srp_pcgrandom));
+		srp_pcgrandom *r = (srp_pcgrandom *) malloc(sizeof(srp_pcgrandom));
 		srp_pcgrandom_seed(r, time(NULL) ^ clock(), 0xda3e39cb94b95bdbULL);
 		size_t i = 0;
 		for (i = 0; i < RAND_BUFF_MAX; i++) {
@@ -530,7 +530,7 @@ static void mpz_fill_random( mpz_t num )
     // was call: BN_rand(num, 256, -1, 0);
     if (RAND_BUFF_MAX - g_rand_idx < 32)
         fill_buff();
-    mpz_from_bin( (char *) (&g_rand_buff[g_rand_idx]), 32, num );
+    mpz_from_bin( (const char *) (&g_rand_buff[g_rand_idx]), 32, num );
     g_rand_idx += 32;
 }
 
