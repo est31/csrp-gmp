@@ -296,7 +296,7 @@ static unsigned char *hash(SRP_HashAlgorithm alg, const unsigned char *d, size_t
 		default: return 0;
 	};
 }
-static int hash_length(SRP_HashAlgorithm alg)
+static size_t hash_length(SRP_HashAlgorithm alg)
 {
 	switch (alg) {
 #ifdef CSRP_USE_SHA1
@@ -581,7 +581,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	if(!ng)
 		goto cleanup_and_exit;
 
-	if (bytes_s == NULL) {
+	if (*bytes_s == NULL) {
 		*len_s = 16;
 		if (RAND_BUFF_MAX - g_rand_idx < 16)
 			fill_buff();
