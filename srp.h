@@ -125,7 +125,7 @@ const unsigned char* srp_verifier_get_session_key( struct SRPVerifier* ver,
 	int* key_length );
 
 
-int srp_verifier_get_session_key_length( struct SRPVerifier* ver );
+size_t srp_verifier_get_session_key_length(struct SRPVerifier* ver);
 
 
 /* user_M must be exactly srp_verifier_get_session_key_length() bytes in size */
@@ -135,10 +135,10 @@ void srp_verifier_verify_session( struct SRPVerifier* ver,
 /*******************************************************************************/
 
 /* The n_hex and g_hex parameters should be 0 unless SRP_NG_CUSTOM is used for ng_type */
-struct SRPUser* srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
-	const char* username, const char* username_for_verifier,
-	const unsigned char* bytes_password, int len_password,
-	const char* n_hex, const char* g_hex);
+struct SRPUser *srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
+	const char *username, const char *username_for_verifier,
+	const unsigned char *bytes_password, size_t len_password,
+	const char *n_hex, const char *g_hex);
 
 void srp_user_delete(struct SRPUser * usr);
 

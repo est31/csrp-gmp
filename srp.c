@@ -41,6 +41,8 @@
 #include <sha/sha.h>
 
 #include "srp.h"
+#define CSRP_USE_SHA1
+#define CSRP_USE_SHA256
 
 #define srp_dbg_data(data, datalen, prevtext) ;
 /*void srp_dbg_data(unsigned char * data, int datalen, char * prevtext)
@@ -237,9 +239,13 @@ struct SRPUser
 static int hash_init(SRP_HashAlgorithm alg, HashCTX *c)
 {
 	switch (alg) {
+#ifdef CSRP_USE_SHA1
 		case SRP_SHA1: return SHA1_Init(&c->sha);
+#endif
 		/*case SRP_SHA224: return SHA224_Init(&c->sha256);*/
+#ifdef CSRP_USE_SHA256
 		case SRP_SHA256: return SHA256_Init(&c->sha256);
+#endif
 		/*case SRP_SHA384: return SHA384_Init(&c->sha512);
 		case SRP_SHA512: return SHA512_Init(&c->sha512);*/
 		default: return -1;
@@ -248,9 +254,13 @@ static int hash_init(SRP_HashAlgorithm alg, HashCTX *c)
 static int hash_update( SRP_HashAlgorithm alg, HashCTX *c, const void *data, size_t len )
 {
 	switch (alg) {
+#ifdef CSRP_USE_SHA1
 		case SRP_SHA1: return SHA1_Update(&c->sha, data, len);
+#endif
 		/*case SRP_SHA224: return SHA224_Update(&c->sha256, data, len);*/
+#ifdef CSRP_USE_SHA256
 		case SRP_SHA256: return SHA256_Update(&c->sha256, data, len);
+#endif
 		/*case SRP_SHA384: return SHA384_Update( &c->sha512, data, len );
 		case SRP_SHA512: return SHA512_Update( &c->sha512, data, len );*/
 		default: return -1;
@@ -259,9 +269,13 @@ static int hash_update( SRP_HashAlgorithm alg, HashCTX *c, const void *data, siz
 static int hash_final( SRP_HashAlgorithm alg, HashCTX *c, unsigned char *md )
 {
 	switch (alg) {
+#ifdef CSRP_USE_SHA1
 		case SRP_SHA1: return SHA1_Final(md, &c->sha);
+#endif
 		/*case SRP_SHA224: return SHA224_Final(md, &c->sha256);*/
+#ifdef CSRP_USE_SHA256
 		case SRP_SHA256: return SHA256_Final(md, &c->sha256);
+#endif
 		/*case SRP_SHA384: return SHA384_Final(md, &c->sha512);
 		case SRP_SHA512: return SHA512_Final(md, &c->sha512);*/
 		default: return -1;
@@ -270,9 +284,13 @@ static int hash_final( SRP_HashAlgorithm alg, HashCTX *c, unsigned char *md )
 static unsigned char *hash(SRP_HashAlgorithm alg, const unsigned char *d, size_t n, unsigned char *md)
 {
 	switch (alg) {
+#ifdef CSRP_USE_SHA1
 		case SRP_SHA1: return SHA1(d, n, md);
+#endif
 		/*case SRP_SHA224: return SHA224( d, n, md );*/
+#ifdef CSRP_USE_SHA256
 		case SRP_SHA256: return SHA256(d, n, md);
+#endif
 		/*case SRP_SHA384: return SHA384( d, n, md );
 		case SRP_SHA512: return SHA512( d, n, md );*/
 		default: return 0;
@@ -281,9 +299,13 @@ static unsigned char *hash(SRP_HashAlgorithm alg, const unsigned char *d, size_t
 static int hash_length(SRP_HashAlgorithm alg)
 {
 	switch (alg) {
+#ifdef CSRP_USE_SHA1
 		case SRP_SHA1: return SHA_DIGEST_LENGTH;
+#endif
 		/*case SRP_SHA224: return SHA224_DIGEST_LENGTH;*/
+#ifdef CSRP_USE_SHA256
 		case SRP_SHA256: return SHA256_DIGEST_LENGTH;
+#endif
 		/*case SRP_SHA384: return SHA384_DIGEST_LENGTH;
 		case SRP_SHA512: return SHA512_DIGEST_LENGTH;*/
 		default: return -1;
@@ -517,7 +539,7 @@ static void mpz_fill_random(mpz_t num)
 	// was call: BN_rand(num, 256, -1, 0);
 	if (RAND_BUFF_MAX - g_rand_idx < 32)
 		fill_buff();
-	mpz_from_bin((const char *) (&g_rand_buff[g_rand_idx]), 32, num);
+	mpz_from_bin((const unsigned char *) (&g_rand_buff[g_rand_idx]), 32, num);
 	g_rand_idx += 32;
 }
 
@@ -563,7 +585,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 		*len_s = 16;
 		if (RAND_BUFF_MAX - g_rand_idx < 16)
 			fill_buff();
-		*bytes_s = malloc(sizeof(char) * 16);
+		*bytes_s = (unsigned char*)malloc(sizeof(char) * 16);
 		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
 		g_rand_idx += 16;
 	}
@@ -579,7 +601,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 
 	*len_v = mpz_num_bytes(v);
 
-	*bytes_v = malloc(*len_v);
+	*bytes_v = (unsigned char*)malloc(*len_v);
 
 	if (!bytes_v)
 		goto cleanup_and_exit;
@@ -687,7 +709,7 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 		calculate_H_AMK(alg, ver->H_AMK, A, ver->M, ver->session_key);
 
 		*len_B = mpz_num_bytes(B);
-		*bytes_B = malloc(*len_B);
+		*bytes_B = (unsigned char*)malloc(*len_B);
 
 		if (!*bytes_B) {
 			free(ver->username);
@@ -755,7 +777,7 @@ const unsigned char *srp_verifier_get_session_key(struct SRPVerifier *ver, int *
 }
 
 
-int srp_verifier_get_session_key_length(struct SRPVerifier *ver)
+size_t srp_verifier_get_session_key_length(struct SRPVerifier *ver)
 {
 	return hash_length(ver->hash_alg);
 }
@@ -773,14 +795,14 @@ void srp_verifier_verify_session(struct SRPVerifier *ver, const unsigned char *u
 
 /*******************************************************************************/
 
-struct SRPUser *srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
+struct SRPUser *srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	const char *username, const char *username_for_verifier,
-	const unsigned char *bytes_password, int len_password,
-	const char *n_hex, const char *g_hex )
+	const unsigned char *bytes_password, size_t len_password,
+	const char *n_hex, const char *g_hex)
 {
 	struct SRPUser *usr = (struct SRPUser *) malloc(sizeof(struct SRPUser));
-	int ulen  = strlen(username) + 1;
-	int uvlen = strlen(username_for_verifier) + 1;
+	size_t ulen  = strlen(username) + 1;
+	size_t uvlen = strlen(username_for_verifier) + 1;
 
 	if (!usr)
 		goto err_exit;
@@ -797,17 +819,17 @@ struct SRPUser *srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	if (!usr->ng || !usr->a || !usr->A || !usr->S)
 		goto err_exit;
 
-	usr->username = malloc(ulen);
-	usr->username_verifier = malloc(uvlen);
-	usr->password = malloc(len_password);
+	usr->username = (char*)malloc(ulen);
+	usr->username_verifier = (char*)malloc(uvlen);
+	usr->password = (unsigned char*)malloc(len_password);
 	usr->password_len = len_password;
 
 	if (!usr->username || !usr->password)
 		goto err_exit;
 
-	memcpy((char *)usr->username, username, ulen);
-	memcpy((char *)usr->username_verifier, username_for_verifier, uvlen);
-	memcpy((char *)usr->password, bytes_password, len_password);
+	memcpy(usr->username, username, ulen);
+	memcpy(usr->username_verifier, username_for_verifier, uvlen);
+	memcpy(usr->password, bytes_password, len_password);
 
 	usr->authenticated = 0;
 
@@ -901,7 +923,7 @@ void srp_user_start_authentication(struct SRPUser *usr, char **username,
 	mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
 
 	*len_A = mpz_num_bytes(usr->A);
-	*bytes_A = malloc(*len_A);
+	*bytes_A = (unsigned char*)malloc(*len_A);
 
 	if (!*bytes_A) {
 		*len_A = 0;
