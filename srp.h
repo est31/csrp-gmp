@@ -90,8 +90,8 @@ typedef enum
 void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char * username_for_verifier,
 	const unsigned char * password, int len_password,
-	const unsigned char ** bytes_s,  int * len_s,
-	const unsigned char ** bytes_v, int * len_v,
+	unsigned char ** bytes_s,  int * len_s,
+	unsigned char ** bytes_v, int * len_v,
 	const char * n_hex, const char * g_hex );
 
 /* Out: bytes_B, len_B.
@@ -108,7 +108,7 @@ struct SRPVerifier* srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	const unsigned char* bytes_v, int len_v,
 	const unsigned char* bytes_A, int len_A,
 	const unsigned char* bytes_b, int len_b,
-	const unsigned char** bytes_B, int* len_B,
+	unsigned char** bytes_B, int* len_B,
 	const char* n_hex, const char* g_hex );
 
 
@@ -130,7 +130,7 @@ int srp_verifier_get_session_key_length( struct SRPVerifier* ver );
 
 /* user_M must be exactly srp_verifier_get_session_key_length() bytes in size */
 void srp_verifier_verify_session( struct SRPVerifier* ver,
-	const unsigned char* user_M, const unsigned char** bytes_HAMK );
+	const unsigned char* user_M, unsigned char** bytes_HAMK );
 
 /*******************************************************************************/
 
@@ -154,16 +154,16 @@ int srp_user_get_session_key_length(struct SRPUser* usr);
 
 /* Output: username, bytes_A, len_A. If you don't want it get written, set username to NULL.
  * If bytes_a == NULL, random data is used for a. */
-void srp_user_start_authentication(struct SRPUser* usr, const char** username,
+void srp_user_start_authentication(struct SRPUser* usr, char** username,
 	const unsigned char* bytes_a, int len_a,
-	const unsigned char** bytes_A, int* len_A);
+	unsigned char** bytes_A, int* len_A);
 
 /* Output: bytes_M, len_M  (len_M may be null and will always be
  *                          srp_user_get_session_key_length() bytes in size) */
 void srp_user_process_challenge(struct SRPUser * usr,
 	const unsigned char * bytes_s, int len_s,
 	const unsigned char * bytes_B, int len_B,
-	const unsigned char ** bytes_M, int * len_M);
+	unsigned char ** bytes_M, int * len_M);
 
 /* bytes_HAMK must be exactly srp_user_get_session_key_length() bytes in size */
 void srp_user_verify_session(struct SRPUser* usr, const unsigned char* bytes_HAMK);

@@ -116,13 +116,15 @@ int test_rfc_5054_compat()
 	struct SRPVerifier *ver;
 	struct SRPUser *usr;
 
-	const unsigned char *bytes_s = (const unsigned char *) srp_5054_salt;
-	const unsigned char * bytes_v = 0;
-	const unsigned char * bytes_A = 0;
-	const unsigned char * bytes_B = 0;
+	unsigned char *bytes_s = 0;
+	bytes_s = malloc(sizeof(srp_5054_salt));
+	memcpy(bytes_s, srp_5054_salt, sizeof(srp_5054_salt));
+	unsigned char * bytes_v = 0;
+	unsigned char * bytes_A = 0;
+	unsigned char * bytes_B = 0;
 
-	const unsigned char * bytes_M    = 0;
-	const unsigned char * bytes_HAMK = 0;
+	unsigned char * bytes_M    = 0;
+	unsigned char * bytes_HAMK = 0;
 	const unsigned char * bytes_S    = 0;
 
 	int len_s = 16;
@@ -162,7 +164,7 @@ int test_rfc_5054_compat()
 	}
 
 	/* User -> Host: (username, bytes_A) */
-	ver =  srp_verifier_new(alg, ng_type, username, (const unsigned char *) srp_5054_salt,
+	ver =  srp_verifier_new(alg, ng_type, username, srp_5054_salt,
 		len_s, bytes_v, len_v, bytes_A, len_A, srp_5054_b, 32, &bytes_B,
 		&len_B, NULL, NULL);
 
@@ -178,7 +180,7 @@ int test_rfc_5054_compat()
 
 
 	/* Host -> User: (bytes_s, bytes_B) */
-	srp_user_process_challenge(usr, (const unsigned char *) srp_5054_salt, len_s, bytes_B,len_B, &bytes_M, &len_M);
+	srp_user_process_challenge(usr, srp_5054_salt, len_s, bytes_B,len_B, &bytes_M, &len_M);
 
 	if (!bytes_M) {
 		printf(" SRP-6a safety check violated for M!\n");
@@ -213,7 +215,8 @@ cleanup:
 	srp_verifier_delete(ver);
 	srp_user_delete(usr);
 
-	free((char *)bytes_v);
+	free(bytes_s);
+	free(bytes_v);
 
 	return 0;
 }
@@ -233,13 +236,13 @@ int main(int argc, char * argv[])
 	struct SRPVerifier *ver;
 	struct SRPUser *usr;
 
-	const unsigned char *bytes_s = 0;
-	const unsigned char *bytes_v = 0;
-	const unsigned char *bytes_A = 0;
-	const unsigned char *bytes_B = 0;
+	unsigned char *bytes_s = 0;
+	unsigned char *bytes_v = 0;
+	unsigned char *bytes_A = 0;
+	unsigned char *bytes_B = 0;
 
-	const unsigned char *bytes_M = 0;
-	const unsigned char *bytes_HAMK = 0;
+	unsigned char *bytes_M = 0;
+	unsigned char *bytes_HAMK = 0;
 
 	int len_s = 0;
 	int len_v = 0;

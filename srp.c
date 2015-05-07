@@ -201,8 +201,8 @@ struct SRPVerifier
 	SRP_HashAlgorithm hash_alg;
 	NGConstant *ng;
 
-	const char *username;
-	const unsigned char *bytes_B;
+	char *username;
+	unsigned char *bytes_B;
 	int authenticated;
 
 	unsigned char M[SHA512_DIGEST_LENGTH];
@@ -220,12 +220,12 @@ struct SRPUser
 	mpz_t A;
 	mpz_t S;
 
-	const unsigned char *bytes_A;
+	unsigned char *bytes_A;
 	int authenticated;
 
-	const char *username;
-	const char *username_verifier;
-	const unsigned char *password;
+	char *username;
+	char *username_verifier;
+	unsigned char *password;
 	int password_len;
 
 	unsigned char M[SHA512_DIGEST_LENGTH];
@@ -548,8 +548,8 @@ static void init_random()
 void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char *username_for_verifier,
 	const unsigned char *password, int len_password,
-	const unsigned char **bytes_s,  int *len_s,
-	const unsigned char **bytes_v, int *len_v,
+	unsigned char **bytes_s,  int *len_s,
+	unsigned char **bytes_v, int *len_v,
 	const char *n_hex, const char *g_hex )
 {
 	mpz_t v; mpz_init(v);
@@ -563,8 +563,8 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 		*len_s = 16;
 		if (RAND_BUFF_MAX - g_rand_idx < 16)
 			fill_buff();
-		*bytes_s = (const unsigned char *) malloc(sizeof(char) * 16);
-		memcpy((unsigned char *) *bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
+		*bytes_s = malloc(sizeof(char) * 16);
+		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
 		g_rand_idx += 16;
 	}
 
@@ -579,12 +579,12 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 
 	*len_v = mpz_num_bytes(v);
 
-	*bytes_v = (const unsigned char *) malloc(*len_v);
+	*bytes_v = malloc(*len_v);
 
 	if (!bytes_v)
 		goto cleanup_and_exit;
 
-	mpz_to_bin(v, (unsigned char *) *bytes_v);
+	mpz_to_bin(v, *bytes_v);
 
 cleanup_and_exit:
 	delete_ng( ng );
@@ -604,7 +604,7 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 	const unsigned char *bytes_v, int len_v,
 	const unsigned char *bytes_A, int len_A,
 	const unsigned char *bytes_b, int len_b,
-	const unsigned char **bytes_B, int *len_B,
+	unsigned char **bytes_B, int *len_B,
 	const char *n_hex, const char *g_hex )
 {
 	mpz_t v; mpz_init(v); mpz_from_bin(bytes_v, len_v, v);
@@ -687,17 +687,17 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 		calculate_H_AMK(alg, ver->H_AMK, A, ver->M, ver->session_key);
 
 		*len_B = mpz_num_bytes(B);
-		*bytes_B = (const unsigned char *) malloc(*len_B);
+		*bytes_B = malloc(*len_B);
 
 		if (!*bytes_B) {
-			free((void*) ver->username);
+			free(ver->username);
 			free(ver);
 			ver = 0;
 			*len_B = 0;
 			goto cleanup_and_exit;
 		}
 
-		mpz_to_bin(B, (unsigned char *) *bytes_B);
+		mpz_to_bin(B, *bytes_B);
 
 		ver->bytes_B = *bytes_B;
 	} else {
@@ -726,8 +726,8 @@ void srp_verifier_delete(struct SRPVerifier *ver)
 {
 	if (ver) {
 		delete_ng(ver->ng);
-		free((char *) ver->username);
-		free((unsigned char *) ver->bytes_B);
+		free(ver->username);
+		free(ver->bytes_B);
 		memset(ver, 0, sizeof(*ver));
 		free(ver);
 	}
@@ -762,7 +762,7 @@ int srp_verifier_get_session_key_length(struct SRPVerifier *ver)
 
 
 /* user_M must be exactly SHA512_DIGEST_LENGTH bytes in size */
-void srp_verifier_verify_session(struct SRPVerifier *ver, const unsigned char *user_M, const unsigned char **bytes_HAMK)
+void srp_verifier_verify_session(struct SRPVerifier *ver, const unsigned char *user_M, unsigned char **bytes_HAMK)
 {
 	if (memcmp(ver->M, user_M, hash_length(ver->hash_alg)) == 0) {
 		ver->authenticated = 1;
@@ -797,9 +797,9 @@ struct SRPUser *srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	if (!usr->ng || !usr->a || !usr->A || !usr->S)
 		goto err_exit;
 
-	usr->username = (const char *) malloc(ulen);
-	usr->username_verifier = (const char *) malloc(uvlen);
-	usr->password = (const unsigned char *) malloc(len_password);
+	usr->username = malloc(ulen);
+	usr->username_verifier = malloc(uvlen);
+	usr->password = malloc(len_password);
 	usr->password_len = len_password;
 
 	if (!usr->username || !usr->password)
@@ -821,12 +821,12 @@ err_exit:
 		mpz_clear(usr->A);
 		mpz_clear(usr->S);
 		if (usr->username)
-			free((void*)usr->username);
+			free(usr->username);
 		if (usr->username_verifier)
-			free((void*)usr->username_verifier);
+			free(usr->username_verifier);
 		if (usr->password) {
-			memset((void*)usr->password, 0, usr->password_len);
-			free((void*)usr->password);
+			memset(usr->password, 0, usr->password_len);
+			free(usr->password);
 		}
 		free(usr);
 	}
@@ -845,14 +845,14 @@ void srp_user_delete(struct SRPUser *usr)
 
 		delete_ng(usr->ng);
 
-		memset((void*)usr->password, 0, usr->password_len);
+		memset(usr->password, 0, usr->password_len);
 
-		free((char *)usr->username);
-		free((char *)usr->username_verifier);
-		free((char *)usr->password);
+		free(usr->username);
+		free(usr->username_verifier);
+		free(usr->password);
 
 		if (usr->bytes_A)
-			free((char *)usr->bytes_A);
+			free(usr->bytes_A);
 
 		memset(usr, 0, sizeof(*usr));
 		free(usr);
@@ -888,9 +888,9 @@ int srp_user_get_session_key_length(struct SRPUser *usr)
 
 
 /* Output: username, bytes_A, len_A */
-void srp_user_start_authentication(struct SRPUser *usr, const char **username,
+void srp_user_start_authentication(struct SRPUser *usr, char **username,
 	const unsigned char  *bytes_a, int len_a,
-	const unsigned char **bytes_A, int *len_A)
+	unsigned char **bytes_A, int *len_A)
 {
 	if (bytes_a) {
 		mpz_from_bin(bytes_a, len_a, usr->a);
@@ -901,7 +901,7 @@ void srp_user_start_authentication(struct SRPUser *usr, const char **username,
 	mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
 
 	*len_A = mpz_num_bytes(usr->A);
-	*bytes_A = (const unsigned char *) malloc(*len_A);
+	*bytes_A = malloc(*len_A);
 
 	if (!*bytes_A) {
 		*len_A = 0;
@@ -910,7 +910,7 @@ void srp_user_start_authentication(struct SRPUser *usr, const char **username,
 		return;
 	}
 
-	mpz_to_bin(usr->A, (unsigned char *) *bytes_A);
+	mpz_to_bin(usr->A, *bytes_A);
 
 	usr->bytes_A = *bytes_A;
 	if (username)
@@ -922,7 +922,7 @@ void srp_user_start_authentication(struct SRPUser *usr, const char **username,
 void  srp_user_process_challenge(struct SRPUser *usr,
 	const unsigned char *bytes_s, int len_s,
 	const unsigned char *bytes_B, int len_B,
-	const unsigned char **bytes_M, int *len_M)
+	unsigned char **bytes_M, int *len_M)
 {
 	mpz_t B; mpz_init(B); mpz_from_bin(bytes_B, len_B, B);
 	mpz_t u; mpz_init(u);
