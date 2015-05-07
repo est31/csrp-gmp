@@ -45,10 +45,10 @@
 #define CSRP_USE_SHA256
 
 #define srp_dbg_data(data, datalen, prevtext) ;
-/*void srp_dbg_data(unsigned char * data, int datalen, char * prevtext)
+/*void srp_dbg_data(unsigned char * data, size_t datalen, char * prevtext)
 {
 	printf(prevtext);
-	int i;
+	size_t i;
 	for (i = 0; i < datalen; i++)
 	{
 		printf("%02X", data[i]);
@@ -228,7 +228,7 @@ struct SRPUser
 	char *username;
 	char *username_verifier;
 	unsigned char *password;
-	int password_len;
+	size_t password_len;
 
 	unsigned char M[SHA512_DIGEST_LENGTH];
 	unsigned char H_AMK[SHA512_DIGEST_LENGTH];
@@ -322,7 +322,7 @@ inline static void mpz_to_bin(const mpz_t op, unsigned char *to)
 	mpz_export(to, NULL, 1, 1, 1, 0, op);
 }
 
-inline static void mpz_from_bin(const unsigned char *s, int len, mpz_t ret)
+inline static void mpz_from_bin(const unsigned char *s, size_t len, mpz_t ret)
 {
 	mpz_import(ret, len, 1, 1, 1, 0, s);
 }
@@ -351,10 +351,10 @@ inline static void mpz_subm(mpz_t op, const mpz_t op1, const mpz_t op2, const mp
 static int H_nn(mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t n1, const mpz_t n2)
 {
 	unsigned char buff[SHA512_DIGEST_LENGTH];
-	int len_N = mpz_num_bytes(N);
-	int len_n1 = mpz_num_bytes(n1);
-	int len_n2 = mpz_num_bytes(n2);
-	int nbytes = len_N + len_N;
+	size_t len_N = mpz_num_bytes(N);
+	size_t len_n1 = mpz_num_bytes(n1);
+	size_t len_n2 = mpz_num_bytes(n2);
+	size_t nbytes = len_N + len_N;
 	unsigned char *bin = (unsigned char *) malloc(nbytes);
 	if (!bin)
 		return 0;
@@ -371,10 +371,10 @@ static int H_nn(mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t 
 	return 1;
 }
 
-static int H_ns(mpz_t result, SRP_HashAlgorithm alg, const unsigned char *n, int len_n, const unsigned char *bytes, int len_bytes)
+static int H_ns(mpz_t result, SRP_HashAlgorithm alg, const unsigned char *n, size_t len_n, const unsigned char *bytes, size_t len_bytes)
 {
 	unsigned char buff[SHA512_DIGEST_LENGTH];
-	int nbytes = len_n + len_bytes;
+	size_t nbytes = len_n + len_bytes;
 	unsigned char *bin = (unsigned char *) malloc(nbytes);
 	if (!bin)
 		return 0;
@@ -386,7 +386,7 @@ static int H_ns(mpz_t result, SRP_HashAlgorithm alg, const unsigned char *n, int
 	return 1;
 }
 
-static int calculate_x(mpz_t result, SRP_HashAlgorithm alg, const unsigned char *salt, int salt_len, const char *username, const unsigned char *password, int password_len)
+static int calculate_x(mpz_t result, SRP_HashAlgorithm alg, const unsigned char *salt, size_t salt_len, const char *username, const unsigned char *password, size_t password_len)
 {
 	unsigned char ucp_hash[SHA512_DIGEST_LENGTH];
 	HashCTX ctx;
@@ -405,7 +405,7 @@ static int calculate_x(mpz_t result, SRP_HashAlgorithm alg, const unsigned char 
 
 static void update_hash_n(SRP_HashAlgorithm alg, HashCTX *ctx, const mpz_t n)
 {
-	unsigned long len = mpz_num_bytes(n);
+	size_t len = mpz_num_bytes(n);
 	unsigned char* n_bytes = (unsigned char *) malloc(len);
 	if (!n_bytes)
 		return;
@@ -426,7 +426,7 @@ static void hash_num( SRP_HashAlgorithm alg, const mpz_t n, unsigned char *dest 
 }
 
 static void calculate_M(SRP_HashAlgorithm alg, NGConstant *ng, unsigned char *dest,
-	const char *I, const unsigned char *s_bytes, int s_len,
+	const char *I, const unsigned char *s_bytes, size_t s_len,
 	const mpz_t A, const mpz_t B, const unsigned char *K)
 {
 	unsigned char H_N[SHA512_DIGEST_LENGTH];
@@ -434,8 +434,8 @@ static void calculate_M(SRP_HashAlgorithm alg, NGConstant *ng, unsigned char *de
 	unsigned char H_I[SHA512_DIGEST_LENGTH];
 	unsigned char H_xor[SHA512_DIGEST_LENGTH];
 	HashCTX ctx;
-	int i = 0;
-	int hash_len = hash_length(alg);
+	size_t i = 0;
+	size_t hash_len = hash_length(alg);
 
 	hash_num(alg, ng->N, H_N);
 	hash_num(alg, ng->g, H_g);
@@ -569,9 +569,9 @@ static void init_random()
 
 void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char *username_for_verifier,
-	const unsigned char *password, int len_password,
-	unsigned char **bytes_s,  int *len_s,
-	unsigned char **bytes_v, int *len_v,
+	const unsigned char *password, size_t len_password,
+	unsigned char **bytes_s,  size_t *len_s,
+	unsigned char **bytes_v, size_t *len_v,
 	const char *n_hex, const char *g_hex )
 {
 	mpz_t v; mpz_init(v);
@@ -622,11 +622,11 @@ cleanup_and_exit:
  */
 struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char *username,
-	const unsigned char *bytes_s, int len_s,
-	const unsigned char *bytes_v, int len_v,
-	const unsigned char *bytes_A, int len_A,
-	const unsigned char *bytes_b, int len_b,
-	unsigned char **bytes_B, int *len_B,
+	const unsigned char *bytes_s, size_t len_s,
+	const unsigned char *bytes_v, size_t len_v,
+	const unsigned char *bytes_A, size_t len_A,
+	const unsigned char *bytes_b, size_t len_b,
+	unsigned char **bytes_B, size_t *len_B,
 	const char *n_hex, const char *g_hex )
 {
 	mpz_t v; mpz_init(v); mpz_from_bin(bytes_v, len_v, v);
@@ -639,7 +639,7 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 	mpz_t tmp1; mpz_init(tmp1);
 	mpz_t tmp2; mpz_init(tmp2);
 	mpz_t tmp3; mpz_init(tmp3);
-	int ulen = strlen(username) + 1;
+	size_t ulen = strlen(username) + 1;
 	NGConstant *ng = new_ng(ng_type, n_hex, g_hex);
 	struct SRPVerifier *ver = 0;
 
@@ -769,7 +769,7 @@ const char *srp_verifier_get_username(struct SRPVerifier *ver)
 }
 
 
-const unsigned char *srp_verifier_get_session_key(struct SRPVerifier *ver, int *key_length)
+const unsigned char *srp_verifier_get_session_key(struct SRPVerifier *ver, size_t *key_length)
 {
 	if (key_length)
 		*key_length = hash_length(ver->hash_alg);
@@ -895,7 +895,7 @@ const char *srp_user_get_username(struct SRPUser *usr)
 }
 
 
-const unsigned char *srp_user_get_session_key(struct SRPUser *usr, int *key_length)
+const unsigned char* srp_user_get_session_key(struct SRPUser* usr, size_t* key_length)
 {
 	if (key_length)
 		*key_length = hash_length(usr->hash_alg);
@@ -903,7 +903,7 @@ const unsigned char *srp_user_get_session_key(struct SRPUser *usr, int *key_leng
 }
 
 
-int srp_user_get_session_key_length(struct SRPUser *usr)
+size_t srp_user_get_session_key_length(struct SRPUser *usr)
 {
 	return hash_length(usr->hash_alg);
 }
@@ -911,8 +911,8 @@ int srp_user_get_session_key_length(struct SRPUser *usr)
 
 /* Output: username, bytes_A, len_A */
 void srp_user_start_authentication(struct SRPUser *usr, char **username,
-	const unsigned char  *bytes_a, int len_a,
-	unsigned char **bytes_A, int *len_A)
+	const unsigned char *bytes_a, size_t len_a,
+	unsigned char **bytes_A, size_t *len_A)
 {
 	if (bytes_a) {
 		mpz_from_bin(bytes_a, len_a, usr->a);
@@ -942,9 +942,9 @@ void srp_user_start_authentication(struct SRPUser *usr, char **username,
 
 /* Output: bytes_M. Buffer length is SHA512_DIGEST_LENGTH */
 void  srp_user_process_challenge(struct SRPUser *usr,
-	const unsigned char *bytes_s, int len_s,
-	const unsigned char *bytes_B, int len_B,
-	unsigned char **bytes_M, int *len_M)
+	const unsigned char *bytes_s, size_t len_s,
+	const unsigned char *bytes_B, size_t len_B,
+	unsigned char **bytes_M, size_t *len_M)
 {
 	mpz_t B; mpz_init(B); mpz_from_bin(bytes_B, len_B, B);
 	mpz_t u; mpz_init(u);

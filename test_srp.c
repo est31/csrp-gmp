@@ -127,13 +127,12 @@ int test_rfc_5054_compat()
 	unsigned char * bytes_HAMK = 0;
 	const unsigned char * bytes_S    = 0;
 
-	int len_s = 16;
-	int len_v = 0;
-	int len_A = 0;
-	int len_B = 0;
-	int len_M = 0;
-	int len_S = 0;
-	int i;
+	size_t len_s = 16;
+	size_t len_v = 0;
+	size_t len_A = 0;
+	size_t len_B = 0;
+	size_t len_M = 0;
+	size_t len_S = 0;
 
 	const char *username = "alice";
 	const char *password = "password123";
@@ -156,7 +155,7 @@ int test_rfc_5054_compat()
 		(const unsigned char *)password,
 		strlen(password), NULL, NULL);
 
-	srp_user_start_authentication(usr, NULL, srp_5054_a, 32, &bytes_A, &len_A);
+	srp_user_start_authentication(usr, NULL, (unsigned char*)srp_5054_a, 32, &bytes_A, &len_A);
 
 	if (memcmp(&srp_5054_A, bytes_A, len_A) != 0) {
 		printf(" computed A doesn't match!\n");
@@ -164,8 +163,8 @@ int test_rfc_5054_compat()
 	}
 
 	/* User -> Host: (username, bytes_A) */
-	ver =  srp_verifier_new(alg, ng_type, username, srp_5054_salt,
-		len_s, bytes_v, len_v, bytes_A, len_A, srp_5054_b, 32, &bytes_B,
+	ver =  srp_verifier_new(alg, ng_type, username, (unsigned char*)srp_5054_salt,
+		len_s, bytes_v, len_v, bytes_A, len_A, (unsigned char*)srp_5054_b, 32, &bytes_B,
 		&len_B, NULL, NULL);
 
 	if (!bytes_B) {
@@ -180,7 +179,7 @@ int test_rfc_5054_compat()
 
 
 	/* Host -> User: (bytes_s, bytes_B) */
-	srp_user_process_challenge(usr, srp_5054_salt, len_s, bytes_B,len_B, &bytes_M, &len_M);
+	srp_user_process_challenge(usr, (unsigned char*)srp_5054_salt, len_s, bytes_B,len_B, &bytes_M, &len_M);
 
 	if (!bytes_M) {
 		printf(" SRP-6a safety check violated for M!\n");
@@ -244,11 +243,11 @@ int main(int argc, char * argv[])
 	unsigned char *bytes_M = 0;
 	unsigned char *bytes_HAMK = 0;
 
-	int len_s = 0;
-	int len_v = 0;
-	int len_A = 0;
-	int len_B = 0;
-	int len_M = 0;
+	size_t len_s = 16;
+	size_t len_v = 0;
+	size_t len_A = 0;
+	size_t len_B = 0;
+	size_t len_M = 0;
 	int i;
 
 	unsigned long long start;
