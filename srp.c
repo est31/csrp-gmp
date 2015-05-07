@@ -27,7 +27,8 @@
  */
 
 #ifdef WIN32
-    #define _CRT_RAND_S
+	#include <windows.h>
+	#include <wincrypt.h>
 #else
 	#include <time.h>
 #endif
