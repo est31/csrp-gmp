@@ -38,17 +38,31 @@ Compared with [csrp](https://github.com/cocagne/csrp), some things
 have changed for the outside.
 As LibGMP doesn't ship with a cryptographically strong PRNG, strong
 PRNGs provided (and seeded) by the OS are used instead. On non-Windows
-operating systems, you should ensure that /dev/urandom is readable,
-or customize random generation in `fill_buff`.
-The call `srp_random_seed` has been removed.
+operating systems, we try to read the file `/dev/urandom`, if this fails,
+we use a (poorly) seeded pcgrandom instead. The call `srp_random_seed`
+has been removed.
 
 The call `srp_user_new` has a new parameter, `username_for_verifier`,
 allowing to use different usernames for verifier and srp login.
 Also, `srp_user_start_authentication` and `srp_verifier_new` have new
 parameters to specify `a` and `b` values.
 
+Also, some cleanups were done regarding types: lengths are now `size_t`,
+and the `const` qualifier has been removed at many places where its
+usage was misleading.
+
 Added option for `srp_create_salted_verification_key` call to specify
-a salt.
+a salt. You can now specify `bytes_b` for `srp_verifier_new`,
+`bytes_a` for `srp_user_start_authentication`, allowing full control
+over the login process, which is good for unit tests.
+`csrp-gmp` itself uses this additional flexibility to automatically test
+for [RFC 5054](https://tools.ietf.org/html/rfc5054) compatibility inside
+`test_srp.c`.
+
+`RFC 5054` compatibility especially means that compatibility to csrp's
+master branch has been dropped. `csrp-gmp` is compatible to the
+[rfc5054_compat](https://github.com/cocagne/csrp/tree/rfc5054_compat)
+branch of `csrp` though.
 
 We ship with OpenSSL's implementation of the SHA256 and SHA-1 hash
 algorithms. Support for other hash algoritms was dropped (but
