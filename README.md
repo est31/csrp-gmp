@@ -69,6 +69,17 @@ algorithms. Support for other hash algoritms was dropped (but
 re-introducing is fairly easy, just copy from an OpenSSL source
 distribution).
 
+Quick Compile helper
+--------------------
+
+If you want to compile this and get running fast, this is the command
+you can use on a recent Ubuntu (~15.04) box on a 64 bit arch:
+
+```
+cc -L/usr/lib/x86_64-linux-gnu/ -I/usr/include/ -lgmp -I. srp.c test_srp.c -Isha sha/sha*.c -lgmp -o gmp_test
+```
+For other distributions/operating systems, you might have to adjust the paths.
+
 Usage Example
 -------------
 
