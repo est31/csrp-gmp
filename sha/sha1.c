@@ -59,7 +59,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <openssl/sha.h>
+#include <sha.h>
 
 #define DATA_ORDER_IS_BIG_ENDIAN
 
