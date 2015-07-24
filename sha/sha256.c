@@ -10,8 +10,8 @@
 # include "sha.h"
 
 /* mem_clr.c */
-unsigned char cleanse_ctr = 0;
-void OPENSSL_cleanse(void *ptr, size_t len)
+unsigned static char cleanse_ctr = 0;
+static void OPENSSL_cleanse(void *ptr, size_t len)
 {
     unsigned char *p = ptr;
     size_t loop = len, ctr = cleanse_ctr;
