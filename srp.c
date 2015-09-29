@@ -534,6 +534,7 @@ static int fill_buff()
 		for (i = 0; i < RAND_BUFF_MAX; i++) {
 			g_rand_buff[i] = srp_pcgrandom_next(r);
 		}
+		free(r);
 	}
 #endif
 	return 1;
@@ -593,6 +594,8 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 		if (RAND_BUFF_MAX - g_rand_idx < 16)
 			fill_buff();
 		*bytes_s = (unsigned char*)malloc(sizeof(char) * 16);
+		if (!*bytes_s)
+			goto cleanup_and_exit;
 		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
 		g_rand_idx += 16;
 	}
@@ -831,7 +834,7 @@ struct SRPUser *srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	usr->password = (unsigned char*)malloc(len_password);
 	usr->password_len = len_password;
 
-	if (!usr->username || !usr->password)
+	if (!usr->username || !usr->password || !usr->username_verifier)
 		goto err_exit;
 
 	memcpy(usr->username, username, ulen);
@@ -851,10 +854,8 @@ err_exit:
 		mpz_clear(usr->S);
 		if (usr->ng)
 			delete_ng(usr->ng);
-		if (usr->username)
-			free(usr->username);
-		if (usr->username_verifier)
-			free(usr->username_verifier);
+		free(usr->username);
+		free(usr->username_verifier);
 		if (usr->password) {
 			memset(usr->password, 0, usr->password_len);
 			free(usr->password);
