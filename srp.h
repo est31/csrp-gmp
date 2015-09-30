@@ -78,6 +78,12 @@ typedef enum
 	SRP_SHA512*/
 } SRP_HashAlgorithm;
 
+typedef enum
+{
+	SRP_OK,
+	SRP_ERR,
+} SRP_Result;
+
 /* Sets the memory functions used by srp.
  * Note: this doesn't set the memory functions used by gmp,
  * but it is supported to have different functions for srp and gmp.
@@ -96,8 +102,11 @@ void srp_set_memory_functions(
  * If provided, they must contain ASCII text of the hexidecimal notation.
  *
  * If bytes_s == NULL, it is filled with random data. The caller is responsible for freeing.
+ *
+ * Returns SRP_OK on success, and SRP_ERR on error.
+ * bytes_s might be in this case invalid, don't free it.
  */
-void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
+SRP_Result srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char *username_for_verifier,
 	const unsigned char *password, size_t len_password,
 	unsigned char **bytes_s,  size_t *len_s,
@@ -111,6 +120,8 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
  * The n_hex and g_hex parameters should be 0 unless SRP_NG_CUSTOM is used for ng_type
  *
  * If bytes_b == NULL, random data is used for b.
+ *
+ * Returns pointer to SRPVerifier on success, and NULL on error.
  */
 struct SRPVerifier* srp_verifier_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	const char *username,
@@ -124,7 +135,7 @@ struct SRPVerifier* srp_verifier_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 
 void srp_verifier_delete( struct SRPVerifier* ver );
 
-
+// srp_verifier_verify_session must have been called before
 int srp_verifier_is_authenticated( struct SRPVerifier* ver );
 
 
@@ -138,7 +149,9 @@ const unsigned char* srp_verifier_get_session_key( struct SRPVerifier* ver,
 size_t srp_verifier_get_session_key_length(struct SRPVerifier* ver);
 
 
-/* user_M must be exactly srp_verifier_get_session_key_length() bytes in size */
+/* Verifies session, on success, it writes bytes_HAMK.
+ * user_M must be exactly srp_verifier_get_session_key_length() bytes in size
+ */
 void srp_verifier_verify_session( struct SRPVerifier* ver,
 	const unsigned char* user_M, unsigned char** bytes_HAMK );
 
@@ -164,7 +177,7 @@ size_t srp_user_get_session_key_length(struct SRPUser* usr);
 
 /* Output: username, bytes_A, len_A. If you don't want it get written, set username to NULL.
  * If bytes_a == NULL, random data is used for a. */
-void srp_user_start_authentication(struct SRPUser* usr, char** username,
+SRP_Result srp_user_start_authentication(struct SRPUser* usr, char** username,
 	const unsigned char* bytes_a, size_t len_a,
 	unsigned char** bytes_A, size_t* len_A);
 

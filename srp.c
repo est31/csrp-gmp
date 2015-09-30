@@ -516,7 +516,7 @@ static void srp_pcgrandom_seed(srp_pcgrandom *r, unsigned long long int state,
 }
 
 
-static int fill_buff()
+static SRP_Result fill_buff()
 {
 	g_rand_idx = 0;
 
@@ -532,7 +532,7 @@ static int fill_buff()
 	CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff);
 	CryptReleaseContext(wctx, 0);
 
-	return 1;
+	return SRP_OK;
 
 #else
 	fp = fopen("/dev/urandom", "r");
@@ -542,6 +542,8 @@ static int fill_buff()
 		fclose(fp);
 	} else {
 		srp_pcgrandom *r = (srp_pcgrandom *) srp_alloc(sizeof(srp_pcgrandom));
+		if (!r)
+			return SRP_ERR;
 		srp_pcgrandom_seed(r, time(NULL) ^ clock(), 0xda3e39cb94b95bdbULL);
 		size_t i = 0;
 		for (i = 0; i < RAND_BUFF_MAX; i++) {
@@ -550,23 +552,27 @@ static int fill_buff()
 		srp_free(r);
 	}
 #endif
-	return 1;
+	return SRP_OK;
 }
 
-static void mpz_fill_random(mpz_t num)
+static SRP_Result mpz_fill_random(mpz_t num)
 {
 	// was call: BN_rand(num, 256, -1, 0);
 	if (RAND_BUFF_MAX - g_rand_idx < 32)
-		fill_buff();
+		if (fill_buff() != SRP_OK)
+			return SRP_ERR;
 	mpz_from_bin((const unsigned char *) (&g_rand_buff[g_rand_idx]), 32, num);
 	g_rand_idx += 32;
+	return SRP_OK;
 }
 
-static void init_random()
+static SRP_Result init_random()
 {
 	if (g_initialized)
-		return;
-	g_initialized = fill_buff();
+		return SRP_OK;
+	SRP_Result ret = fill_buff();
+	g_initialized = (ret == SRP_OK);
+	return ret;
 }
 
 #define srp_dbg_num(num, text) ;
@@ -586,29 +592,33 @@ static void init_random()
  *
  ***********************************************************************************************************/
 
-void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
+SRP_Result srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	SRP_NGType ng_type, const char *username_for_verifier,
 	const unsigned char *password, size_t len_password,
 	unsigned char **bytes_s,  size_t *len_s,
 	unsigned char **bytes_v, size_t *len_v,
 	const char *n_hex, const char *g_hex )
 {
+	SRP_Result ret = SRP_OK;
+
 	mpz_t v; mpz_init(v);
 	mpz_t x; mpz_init(x);
 	NGConstant *ng = new_ng(ng_type, n_hex, g_hex);
 
-	if(!ng)
-		goto cleanup_and_exit;
+	if (!ng)
+		goto error_and_exit;
 
-	init_random(); /* Only happens once */
+	if (init_random() != SRP_OK) /* Only happens once */
+		goto error_and_exit;
 
 	if (*bytes_s == NULL) {
 		*len_s = 16;
 		if (RAND_BUFF_MAX - g_rand_idx < 16)
-			fill_buff();
+			if (fill_buff() != SRP_OK)
+				goto error_and_exit;
 		*bytes_s = (unsigned char*)srp_alloc(sizeof(char) * 16);
 		if (!*bytes_s)
-			goto cleanup_and_exit;
+			goto error_and_exit;
 		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
 		g_rand_idx += 16;
 	}
@@ -616,7 +626,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 
 	if (!calculate_x(x, alg, *bytes_s, *len_s, username_for_verifier,
 			password, len_password))
-		goto cleanup_and_exit;
+		goto error_and_exit;
 
 	srp_dbg_num(x, "Server calculated x: ");
 
@@ -627,7 +637,7 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 	*bytes_v = (unsigned char*)srp_alloc(*len_v);
 
 	if (!bytes_v)
-		goto cleanup_and_exit;
+		goto error_and_exit;
 
 	mpz_to_bin(v, *bytes_v);
 
@@ -635,6 +645,10 @@ cleanup_and_exit:
 	delete_ng( ng );
 	mpz_clear(v);
 	mpz_clear(x);
+	return ret;
+error_and_exit:
+	ret = SRP_ERR;
+	goto cleanup_and_exit;
 }
 
 
@@ -677,7 +691,11 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 	if (!ver)
 		goto cleanup_and_exit;
 
-	init_random(); /* Only happens once */
+	if (init_random() != SRP_OK) { /* Only happens once */
+		srp_free(ver);
+		ver = 0;
+		goto cleanup_and_exit;
+	}
 
 	ver->username = (char *) srp_alloc(ulen);
 	ver->hash_alg = alg;
@@ -699,7 +717,11 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 		if (bytes_b) {
 			mpz_from_bin(bytes_b, len_b, b);
 		} else {
-			mpz_fill_random(b);
+			if (mpz_fill_random(b) != SRP_OK) {
+				srp_free(ver);
+				ver = 0;
+				goto cleanup_and_exit;
+			}
 		}
 
 		if (!H_nn(k, alg, ng->N, ng->N, ng->g)) {
@@ -830,7 +852,8 @@ struct SRPUser *srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	if (!usr)
 		goto err_exit;
 
-	init_random(); /* Only happens once */
+	if (init_random() != SRP_OK) /* Only happens once */
+		goto err_exit;
 
 	usr->hash_alg = alg;
 	usr->ng = new_ng(ng_type, n_hex, g_hex);
@@ -933,14 +956,15 @@ size_t srp_user_get_session_key_length(struct SRPUser *usr)
 
 
 /* Output: username, bytes_A, len_A */
-void srp_user_start_authentication(struct SRPUser *usr, char **username,
+SRP_Result srp_user_start_authentication(struct SRPUser *usr, char **username,
 	const unsigned char *bytes_a, size_t len_a,
 	unsigned char **bytes_A, size_t *len_A)
 {
 	if (bytes_a) {
 		mpz_from_bin(bytes_a, len_a, usr->a);
 	} else {
-		mpz_fill_random(usr->a);
+		if (mpz_fill_random(usr->a) != SRP_OK)
+			goto error_and_exit;
 	}
 
 	mpz_powm(usr->A, usr->ng->g, usr->a, usr->ng->N);
@@ -948,18 +972,22 @@ void srp_user_start_authentication(struct SRPUser *usr, char **username,
 	*len_A = mpz_num_bytes(usr->A);
 	*bytes_A = (unsigned char*)srp_alloc(*len_A);
 
-	if (!*bytes_A) {
-		*len_A = 0;
-		*bytes_A = 0;
-		*username = 0;
-		return;
-	}
+	if (!*bytes_A)
+		goto error_and_exit;
 
 	mpz_to_bin(usr->A, *bytes_A);
 
 	usr->bytes_A = *bytes_A;
 	if (username)
 		*username = usr->username;
+
+	return SRP_OK;
+
+error_and_exit:
+	*len_A = 0;
+	*bytes_A = 0;
+	*username = 0;
+	return SRP_ERR;
 }
 
 

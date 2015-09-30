@@ -268,9 +268,10 @@ int main(int argc, char * argv[])
 		g_hex = test_g_hex;
 	}
 
-	srp_create_salted_verification_key(alg, ng_type, ver_unam,
-				(const unsigned char *)password, strlen(password),
-				&bytes_s, &len_s, &bytes_v, &len_v, n_hex, g_hex);
+	if (srp_create_salted_verification_key(alg, ng_type, ver_unam,
+			(const unsigned char *)password, strlen(password),
+			&bytes_s, &len_s, &bytes_v, &len_v, n_hex, g_hex) != RES_OK)
+		return 1;
 
 	start = get_usec();
 
@@ -279,7 +280,11 @@ int main(int argc, char * argv[])
 				(const unsigned char *)password,
 				strlen(password), n_hex, g_hex);
 
-		srp_user_start_authentication(usr, NULL, NULL, 0, &bytes_A, &len_A);
+		if (srp_user_start_authentication(usr, NULL, NULL, 0, &bytes_A, &len_A) != SRP_OK) {
+			printf("Error while starting SRP-6a authentication!\n");
+			goto cleanup;
+		}
+
 
 		/* User -> Host: (username, bytes_A) */
 		ver =  srp_verifier_new(alg, ng_type, username, bytes_s, len_s, bytes_v, len_v,
@@ -320,7 +325,7 @@ cleanup:
 
 	duration = get_usec() - start;
 
-	printf("Usec per login sequence (server + user): %d\n", (int)(duration / NITER));
+	printf("Usec per login sequence: %d\n", (int)(duration / NITER));
 
 
 	free((char *)bytes_s);
