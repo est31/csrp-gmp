@@ -230,7 +230,7 @@ const char * test_g_hex = "2";
 int main(int argc, char * argv[])
 {
 	test_rfc_5054_compat();
-	printf("Performing the speedtest.\n");
+	printf("Performing the speedtest, %d iterations.\n", NITER);
 
 	struct SRPVerifier *ver;
 	struct SRPUser *usr;
@@ -320,7 +320,7 @@ cleanup:
 
 	duration = get_usec() - start;
 
-	printf("Usec per call: %d\n", (int)(duration / NITER));
+	printf("Usec per login sequence (server + user): %d\n", (int)(duration / NITER));
 
 
 	free((char *)bytes_s);
