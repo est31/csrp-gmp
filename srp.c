@@ -612,15 +612,16 @@ SRP_Result srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 		goto error_and_exit;
 
 	if (*bytes_s == NULL) {
-		*len_s = 16;
-		if (RAND_BUFF_MAX - g_rand_idx < 16)
+		size_t size_to_fill = 16;
+		*len_s = size_to_fill;
+		if (RAND_BUFF_MAX - g_rand_idx < size_to_fill)
 			if (fill_buff() != SRP_OK)
 				goto error_and_exit;
-		*bytes_s = (unsigned char*)srp_alloc(sizeof(char) * 16);
+		*bytes_s = (unsigned char*)srp_alloc(size_to_fill);
 		if (!*bytes_s)
 			goto error_and_exit;
-		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, sizeof(char) * 16);
-		g_rand_idx += 16;
+		memcpy(*bytes_s, &g_rand_buff + g_rand_idx, size_to_fill);
+		g_rand_idx += size_to_fill;
 	}
 
 
