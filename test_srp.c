@@ -270,7 +270,7 @@ int main(int argc, char * argv[])
 
 	if (srp_create_salted_verification_key(alg, ng_type, ver_unam,
 			(const unsigned char *)password, strlen(password),
-			&bytes_s, &len_s, &bytes_v, &len_v, n_hex, g_hex) != RES_OK)
+			&bytes_s, &len_s, &bytes_v, &len_v, n_hex, g_hex) != SRP_OK)
 		return 1;
 
 	start = get_usec();
