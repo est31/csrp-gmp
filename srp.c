@@ -493,34 +493,6 @@ static SRP_Result calculate_H_AMK(SRP_HashAlgorithm alg, unsigned char *dest, co
 	hash_final(alg, &ctx, dest);
 }
 
-#ifndef WIN32
-
-struct srp_pcgrandom {
-	unsigned long long int m_state;
-	unsigned long long int m_inc;
-}; typedef struct srp_pcgrandom srp_pcgrandom;
-
-static unsigned long int srp_pcgrandom_next(srp_pcgrandom *r)
-{
-	unsigned long long int oldstate = r->m_state;
-	r->m_state = oldstate * 6364136223846793005ULL + r->m_inc;
-
-	unsigned long int xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
-	unsigned long int rot = oldstate >> 59u;
-	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
-}
-
-static void srp_pcgrandom_seed(srp_pcgrandom *r, unsigned long long int state,
-	unsigned long long int  seq)
-{
-	r->m_state = 0U;
-	r->m_inc = (seq << 1u) | 1u;
-	srp_pcgrandom_next(r);
-	r->m_state += state;
-	srp_pcgrandom_next(r);
-}
-#endif
-
 static SRP_Result fill_buff()
 {
 	g_rand_idx = 0;
