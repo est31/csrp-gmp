@@ -546,8 +546,10 @@ static SRP_Result fill_buff()
 	if (!fp)
 		return SRP_ERR;
 
-	fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
-	fclose(fp);
+	if (fread(g_rand_buff, sizeof(g_rand_buff), 1, fp) != 1)
+		return SRP_ERR;
+	if (fclose(fp))
+		return SRP_ERR;
 #endif
 	return SRP_OK;
 }
