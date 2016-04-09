@@ -80,8 +80,8 @@ typedef enum
 
 typedef enum
 {
-	SRP_OK,
 	SRP_ERR,
+	SRP_OK,
 } SRP_Result;
 
 /* Sets the memory functions used by srp.
