@@ -1,0 +1,5 @@
+# Binary as suggested by "the quick compile helper"
+srp-test
+
+# Temporary files
+*swp
