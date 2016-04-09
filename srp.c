@@ -529,29 +529,21 @@ static SRP_Result fill_buff()
 
 #ifdef WIN32
 
-	CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
-	CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff);
-	CryptReleaseContext(wctx, 0);
-
-	return SRP_OK;
+	if (!CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+		return SRP_ERR;
+	if (!CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE*) g_rand_buff))
+		return SRP_ERR;
+	if (!CryptReleaseContext(wctx, 0))
+		return SRP_ERR;
 
 #else
 	fp = fopen("/dev/urandom", "r");
 
-	if (fp) {
-		fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
-		fclose(fp);
-	} else {
-		srp_pcgrandom *r = (srp_pcgrandom *) srp_alloc(sizeof(srp_pcgrandom));
-		if (!r)
-			return SRP_ERR;
-		srp_pcgrandom_seed(r, time(NULL) ^ clock(), 0xda3e39cb94b95bdbULL);
-		size_t i = 0;
-		for (i = 0; i < RAND_BUFF_MAX; i++) {
-			g_rand_buff[i] = srp_pcgrandom_next(r);
-		}
-		srp_free(r);
-	}
+	if (!fp)
+		return SRP_ERR;
+
+	fread(g_rand_buff, sizeof(g_rand_buff), 1, fp);
+	fclose(fp);
 #endif
 	return SRP_OK;
 }
