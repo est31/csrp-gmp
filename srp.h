@@ -56,12 +56,10 @@
 #ifndef SRP_H
 #define SRP_H
 
-
 struct SRPVerifier;
 struct SRPUser;
 
-typedef enum
-{
+typedef enum {
 	SRP_NG_1024,
 	SRP_NG_2048,
 	SRP_NG_4096,
@@ -69,8 +67,7 @@ typedef enum
 	SRP_NG_CUSTOM
 } SRP_NGType;
 
-typedef enum
-{
+typedef enum {
 	SRP_SHA1,
 	/*SRP_SHA224,*/
 	SRP_SHA256,
@@ -78,8 +75,7 @@ typedef enum
 	SRP_SHA512*/
 } SRP_HashAlgorithm;
 
-typedef enum
-{
+typedef enum {
 	SRP_ERR,
 	SRP_OK,
 } SRP_Result;
@@ -137,48 +133,43 @@ struct SRPVerifier* srp_verifier_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 
 // clang-format on
 
-
-void srp_verifier_delete( struct SRPVerifier* ver );
+void srp_verifier_delete(struct SRPVerifier *ver);
 
 // srp_verifier_verify_session must have been called before
-int srp_verifier_is_authenticated( struct SRPVerifier* ver );
+int srp_verifier_is_authenticated(struct SRPVerifier *ver);
 
-
-const char * srp_verifier_get_username( struct SRPVerifier* ver );
+const char *srp_verifier_get_username(struct SRPVerifier *ver);
 
 /* key_length may be null */
-const unsigned char* srp_verifier_get_session_key( struct SRPVerifier* ver,
-	size_t *key_length );
+const unsigned char *srp_verifier_get_session_key(
+	struct SRPVerifier *ver, size_t *key_length);
 
-
-size_t srp_verifier_get_session_key_length(struct SRPVerifier* ver);
-
+size_t srp_verifier_get_session_key_length(struct SRPVerifier *ver);
 
 /* Verifies session, on success, it writes bytes_HAMK.
  * user_M must be exactly srp_verifier_get_session_key_length() bytes in size
  */
-void srp_verifier_verify_session( struct SRPVerifier* ver,
-	const unsigned char* user_M, unsigned char** bytes_HAMK );
+void srp_verifier_verify_session(
+	struct SRPVerifier *ver, const unsigned char *user_M, unsigned char **bytes_HAMK);
 
 /*******************************************************************************/
 
 /* The n_hex and g_hex parameters should be 0 unless SRP_NG_CUSTOM is used for ng_type */
 struct SRPUser *srp_user_new(SRP_HashAlgorithm alg, SRP_NGType ng_type,
 	const char *username, const char *username_for_verifier,
-	const unsigned char *bytes_password, size_t len_password,
-	const char *n_hex, const char *g_hex);
+	const unsigned char *bytes_password, size_t len_password, const char *n_hex,
+	const char *g_hex);
 
-void srp_user_delete(struct SRPUser * usr);
+void srp_user_delete(struct SRPUser *usr);
 
-int srp_user_is_authenticated(struct SRPUser * usr);
+int srp_user_is_authenticated(struct SRPUser *usr);
 
-
-const char* srp_user_get_username(struct SRPUser * usr);
+const char *srp_user_get_username(struct SRPUser *usr);
 
 /* key_length may be null */
-const unsigned char* srp_user_get_session_key(struct SRPUser* usr, size_t* key_length);
+const unsigned char *srp_user_get_session_key(struct SRPUser *usr, size_t *key_length);
 
-size_t srp_user_get_session_key_length(struct SRPUser* usr);
+size_t srp_user_get_session_key_length(struct SRPUser *usr);
 
 // clang-format off
 
@@ -198,6 +189,6 @@ void srp_user_process_challenge(struct SRPUser *usr,
 // clang-format on
 
 /* bytes_HAMK must be exactly srp_user_get_session_key_length() bytes in size */
-void srp_user_verify_session(struct SRPUser* usr, const unsigned char* bytes_HAMK);
+void srp_user_verify_session(struct SRPUser *usr, const unsigned char *bytes_HAMK);
 
 #endif /* Include Guard */
