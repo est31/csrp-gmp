@@ -510,6 +510,7 @@ static SRP_Result calculate_H_AMK(SRP_HashAlgorithm alg, unsigned char *dest,
 	hash_update(alg, &ctx, K, hash_length(alg));
 
 	hash_final(alg, &ctx, dest);
+	return SRP_OK;
 }
 
 static SRP_Result fill_buff()
