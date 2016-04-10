@@ -386,8 +386,8 @@ inline static void mpz_subm(
 	mpz_mod(op, tmp, d);
 }
 
-static SRP_Result H_nn(mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t n1,
-	const mpz_t n2)
+static SRP_Result H_nn(
+	mpz_t result, SRP_HashAlgorithm alg, const mpz_t N, const mpz_t n1, const mpz_t n2)
 {
 	unsigned char buff[SHA512_DIGEST_LENGTH];
 	size_t len_N = mpz_num_bytes(N);
@@ -527,8 +527,7 @@ static SRP_Result fill_buff()
 
 	if (!CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
 		return SRP_ERR;
-	if (!CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE *)g_rand_buff))
-		return SRP_ERR;
+	if (!CryptGenRandom(wctx, sizeof(g_rand_buff), (BYTE *)g_rand_buff)) return SRP_ERR;
 	if (!CryptReleaseContext(wctx, 0)) return SRP_ERR;
 
 #else
@@ -609,8 +608,8 @@ SRP_Result srp_create_salted_verification_key( SRP_HashAlgorithm alg,
 		g_rand_idx += size_to_fill;
 	}
 
-	if (!calculate_x(x, alg, *bytes_s, *len_s, username_for_verifier, password,
-		    len_password))
+	if (!calculate_x(
+			x, alg, *bytes_s, *len_s, username_for_verifier, password, len_password))
 		goto error_and_exit;
 
 	srp_dbg_num(x, "Server calculated x: ");
@@ -721,8 +720,8 @@ struct SRPVerifier *srp_verifier_new(SRP_HashAlgorithm alg,
 
 		if (!hash_num(alg, S, ver->session_key)) goto ver_cleanup_and_exit;
 
-		if (!calculate_M(alg, ng, ver->M, username, bytes_s, len_s, A, B,
-			    ver->session_key)) {
+		if (!calculate_M(
+				alg, ng, ver->M, username, bytes_s, len_s, A, B, ver->session_key)) {
 			goto ver_cleanup_and_exit;
 		}
 		if (!calculate_H_AMK(alg, ver->H_AMK, A, ver->M, ver->session_key)) {
@@ -971,7 +970,7 @@ void  srp_user_process_challenge(struct SRPUser *usr,
 	srp_dbg_num(u, "Client calculated u: ");
 
 	if (!calculate_x(x, usr->hash_alg, bytes_s, len_s, usr->username_verifier,
-		    usr->password, usr->password_len))
+			usr->password, usr->password_len))
 		goto cleanup_and_exit;
 
 	srp_dbg_num(x, "Client calculated x: ");
@@ -995,14 +994,12 @@ void  srp_user_process_challenge(struct SRPUser *usr,
 		mpz_powm(usr->S, tmp1, tmp2, usr->ng->N);
 		// clang-format on
 
-		if (!hash_num(usr->hash_alg, usr->S, usr->session_key))
-			goto cleanup_and_exit;
+		if (!hash_num(usr->hash_alg, usr->S, usr->session_key)) goto cleanup_and_exit;
 
-		if (!calculate_M(usr->hash_alg, usr->ng, usr->M, usr->username, bytes_s,
-			    len_s, usr->A, B, usr->session_key))
+		if (!calculate_M(usr->hash_alg, usr->ng, usr->M, usr->username, bytes_s, len_s,
+				usr->A, B, usr->session_key))
 			goto cleanup_and_exit;
-		if (!calculate_H_AMK(
-			    usr->hash_alg, usr->H_AMK, usr->A, usr->M, usr->session_key))
+		if (!calculate_H_AMK(usr->hash_alg, usr->H_AMK, usr->A, usr->M, usr->session_key))
 			goto cleanup_and_exit;
 
 		*bytes_M = usr->M;
