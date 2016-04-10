@@ -69,8 +69,31 @@ algorithms. Support for other hash algoritms was dropped (but
 re-introducing is fairly easy, just copy from an OpenSSL source
 distribution).
 
-Quick Compile helper
---------------------
+Development
+-----------
+
+### Clang format
+
+You can invoke clang-format like:
+```
+clang-format-3.7 -i *.c *.h
+```
+
+You should do this before doing any commit to the code.
+Best is you put it into a commit hook, like when you execute
+these bash instructions:
+```bash
+cat << "EOF" > .git/hooks/pre-commit
+#!/bin/bash
+for f in `git diff-index --cached --name-only HEAD | grep -E "\.(c|h)$"` ; do
+	clang-format-3.7 -i "${f}"
+	git add "${f}"
+done
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### Quick compile helper
 
 If you want to compile this and get running fast, this is the command
 you can use on a recent Ubuntu (~15.04) box on a 64 bit arch:
