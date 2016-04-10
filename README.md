@@ -2,8 +2,9 @@ csrp-gmp
 ========
 
 csrp-gmp is a minimal C implementation of the [Secure Remote Password
-protocol](http://srp.stanford.edu/), originally written by Tom Cocagne
-to depend on OpenSSL, ported to LibGMP by est31.
+protocol](http://srp.stanford.edu/),
+[originally written](https://github.com/cocagne/csrp) by Tom Cocagne
+to depend on OpenSSL, ported to LibGMP and highly improved by est31.
 The project is intended for direct inclusion into utilizing programs.
 It's only dependency is LibGMP.
 
@@ -31,16 +32,14 @@ the authenticated connection. However, successful authentication does
 result in a cryptographically strong shared key that can be used
 for symmetric-key encryption.
 
-Porter's notes
---------------
+Various notes
+-------------
 
-Compared with [csrp](https://github.com/cocagne/csrp), some things
-have changed for the outside.
 As LibGMP doesn't ship with a cryptographically strong PRNG, strong
-PRNGs provided (and seeded) by the OS are used instead. On non-Windows
-operating systems, we try to read the file `/dev/urandom`, if this fails,
-we use a (poorly) seeded pcgrandom instead. The call `srp_random_seed`
-has been removed.
+PRNGs provided (and seeded) by the OS are used instead. If you are on
+a non-windows platform, make sure that the file `/dev/urandom` exists
+and can be read by the application. Support for custom seeding has
+been removed.
 
 The call `srp_user_new` has a new parameter, `username_for_verifier`,
 allowing to use different usernames for verifier and srp login.
@@ -58,11 +57,6 @@ over the login process, which is good for unit tests.
 `csrp-gmp` itself uses this additional flexibility to automatically test
 for [RFC 5054](https://tools.ietf.org/html/rfc5054) compatibility inside
 `test_srp.c`.
-
-`RFC 5054` compatibility especially means that compatibility to csrp's
-master branch has been dropped. `csrp-gmp` is compatible to the
-[rfc5054_compat](https://github.com/cocagne/csrp/tree/rfc5054_compat)
-branch of `csrp` though.
 
 We ship with OpenSSL's implementation of the SHA256 and SHA-1 hash
 algorithms. Support for other hash algoritms was dropped (but
